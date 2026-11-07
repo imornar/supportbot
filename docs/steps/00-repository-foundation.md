@@ -2,7 +2,7 @@
 
 - Phase: Foundation
 - Depends on: none
-- Status: in_review
+- Status: done
 - Spec: sections 21, 23, 25
 
 ## Goal
