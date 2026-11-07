@@ -1,0 +1,14 @@
+---
+description: SupportPilot agent workflow, scope limits, and security boundaries
+alwaysApply: true
+---
+
+# SupportPilot
+
+- Read `spec.md`, `AGENTS.md`, and the active file in `docs/steps/` before implementing.
+- One step, one branch, one pull request. Stop after the PR. Do not merge.
+- Do not add features from a later step.
+- Server-side authorization and tenant filters are mandatory. Prompts are not a security boundary.
+- Model output is untrusted input. The model does not get a database connection or free tool choice.
+- Secrets are server-only. Do not commit `.env` or invent credential values.
+- Report real test and CI results. Do not claim a check passed unless it did.
