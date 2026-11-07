@@ -146,18 +146,21 @@ Validate required environment variables at startup or during server initializati
 ### Deployment environments
 
 **Local development**
+
 - Next.js application.
 - Local PostgreSQL with `pgvector`, preferably through Docker Compose.
 - Local environment variables.
 - Seeded development users and sample documents.
 
 **Preview**
+
 - Vercel preview deployment.
 - Isolated preview database or a dedicated non-production database/schema with appropriate isolation.
 - Non-production API keys and data.
 - No automatic access to production customer data.
 
 **Production**
+
 - Vercel production deployment.
 - Managed PostgreSQL with `pgvector`.
 - Production authentication and secrets.
@@ -746,22 +749,26 @@ The agent may refine this roadmap into smaller steps and PRs. It must preserve t
 ### Phase A — Foundation
 
 **Step 0: Specification and repository foundation**
+
 - Establish project documentation, `AGENTS.md`, repository conventions, environment examples, PR template, and CI.
 - Do not implement application features.
 
 **Step 1: Next.js application foundation**
+
 - Create the Next.js App Router project.
 - Configure TypeScript, linting, formatting, tests, environment validation, and basic layout.
 - Add health and readiness routes.
 - Verify Vercel-compatible build configuration.
 
 **Step 2: Database and tenant model**
+
 - Configure PostgreSQL and `pgvector`.
 - Add schema, migrations, and seed data.
 - Implement tenant, user, membership, role, and audit-event foundations.
 - Test tenant-scoped data access.
 
 **Step 3: Authentication and authorization**
+
 - Integrate the selected production authentication provider.
 - Add development-only seeded identities behind explicit environment gating.
 - Implement centralized permissions and authorization tests.
@@ -769,56 +776,71 @@ The agent may refine this roadmap into smaller steps and PRs. It must preserve t
 ### Phase B — Knowledge and AI
 
 **Step 4: Document ingestion**
+
 - Implement protected document upload, metadata, versions, chunking, embeddings, and ingestion status.
 
 **Step 5: Retrieval**
+
 - Implement tenant-scoped vector retrieval, relevance filtering, and source metadata.
 - Add retrieval tests and a small evaluation dataset.
 
 **Step 6: Grounded answer generation**
+
 - Add model-provider abstraction, structured outputs, citation validation, abstention, and safe error handling.
 
 **Step 7: Support API and conversation persistence**
+
 - Add the customer messaging API, conversation history, validation, and authorization.
 
 **Step 8: Controlled AI workflow**
+
 - Add explicit workflow states, retrieval, evidence checks, answer generation, and escalation decisions.
 - Use LangGraph.js if justified by the workflow complexity.
 
 **Step 9: Authorized order lookup**
+
 - Implement a read-only order tool with strict ownership checks and limited returned fields.
 
 ### Phase C — Human Support
 
 **Step 10: Ticket and escalation backend**
+
 - Add ticket lifecycle, escalation reasons, assignment, staff notes, replies, and audit events.
 
 **Step 11: Staff workflows**
+
 - Add knowledge-manager document operations, support-agent ticket operations, and admin membership management.
 
 **Step 12: Customer chat UI**
+
 - Add chat, citations, conversation history, fallback states, and ticket status.
 
 **Step 13: Staff UI**
+
 - Add knowledge-base management, support inbox, ticket detail, and basic admin screens.
 
 ### Phase D — Quality and Production
 
 **Step 14: Evaluation harness**
+
 - Add repeatable retrieval and answer evaluations, failure cases, and quality reporting.
 
 **Step 15: Security hardening**
+
 - Review authentication, authorization, tenant isolation, upload validation, prompt injection, rate limits, and audit coverage.
 - Fix issues found; do not defer foundational security controls until this phase.
 
 **Step 16: Reliability and observability**
+
 - Add structured logs, correlation IDs, bounded retries, timeout policies, error handling, and usage metrics.
 
 **Step 17: Cloud deployment**
+
 - Configure Vercel, managed PostgreSQL, environment variables, migrations, preview isolation, and production settings.
 - Verify deployed critical workflows and document rollback and recovery procedures.
 
 **Step 18: Assessment readiness**
+
 - Prepare architecture diagrams, ADRs, threat model, evaluation results, cost and latency trade-offs, demo script, known limitations, and reviewer questions.
 - Ensure the user can explain the implementation and make live changes confidently.
 

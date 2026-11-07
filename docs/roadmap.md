@@ -4,28 +4,28 @@ Each file in [`docs/steps/`](./steps/) is one pull request. Dependencies are mer
 
 Status values: `not_started`, `in_progress`, `in_review`, `done`.
 
-| Step | Title | Depends on | Status |
-| --- | --- | --- | --- |
-| [00](./steps/00-repository-foundation.md) | Repository and agent workflow | none | in_review |
-| [01](./steps/01-nextjs-foundation.md) | Next.js application foundation | 00 | not_started |
-| [02](./steps/02-database-pgvector.md) | PostgreSQL, Drizzle, and pgvector | 01 | not_started |
-| [03](./steps/03-tenant-audit-schema.md) | Tenant, membership, and audit schema | 02 | not_started |
-| [04](./steps/04-auth-and-permissions.md) | Authentication and permissions | 03 | not_started |
-| [05](./steps/05-document-ingestion.md) | Document ingestion | 04 | not_started |
-| [06](./steps/06-retrieval.md) | Tenant-scoped retrieval | 05 | not_started |
-| [07](./steps/07-grounded-answers.md) | Grounded answers and citations | 06 | not_started |
-| [08](./steps/08-conversations-api.md) | Conversations API | 04, 07 | not_started |
-| [09](./steps/09-support-workflow.md) | Controlled support workflow | 07, 08 | not_started |
-| [10](./steps/10-order-lookup.md) | Authorized order lookup | 04, 09 | not_started |
-| [11](./steps/11-tickets.md) | Tickets and escalation | 08, 09 | not_started |
-| [12](./steps/12-staff-operations.md) | Staff and admin operations | 05, 11 | not_started |
-| [13](./steps/13-customer-ui.md) | Customer chat UI | 08, 09, 11 | not_started |
-| [14](./steps/14-staff-ui.md) | Staff and admin UI | 12, 13 | not_started |
-| [15](./steps/15-evaluation.md) | Evaluation harness | 06, 07, 09 | not_started |
-| [16](./steps/16-security-verification.md) | Security verification | 04 through the latest merged product step | not_started |
-| [17](./steps/17-observability.md) | Reliability and observability | 09, 11 | not_started |
-| [18](./steps/18-cloud-deployment.md) | Cloud deployment | 02, 17 | not_started |
-| [19](./steps/19-assessment.md) | Assessment readiness | the deployed slice | not_started |
+| Step                                      | Title                                | Depends on                                | Status      |
+| ----------------------------------------- | ------------------------------------ | ----------------------------------------- | ----------- |
+| [00](./steps/00-repository-foundation.md) | Repository and agent workflow        | none                                      | done        |
+| [01](./steps/01-nextjs-foundation.md)     | Next.js application foundation       | 00                                        | in_review   |
+| [02](./steps/02-database-pgvector.md)     | PostgreSQL, Drizzle, and pgvector    | 01                                        | not_started |
+| [03](./steps/03-tenant-audit-schema.md)   | Tenant, membership, and audit schema | 02                                        | not_started |
+| [04](./steps/04-auth-and-permissions.md)  | Authentication and permissions       | 03                                        | not_started |
+| [05](./steps/05-document-ingestion.md)    | Document ingestion                   | 04                                        | not_started |
+| [06](./steps/06-retrieval.md)             | Tenant-scoped retrieval              | 05                                        | not_started |
+| [07](./steps/07-grounded-answers.md)      | Grounded answers and citations       | 06                                        | not_started |
+| [08](./steps/08-conversations-api.md)     | Conversations API                    | 04, 07                                    | not_started |
+| [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | not_started |
+| [10](./steps/10-order-lookup.md)          | Authorized order lookup              | 04, 09                                    | not_started |
+| [11](./steps/11-tickets.md)               | Tickets and escalation               | 08, 09                                    | not_started |
+| [12](./steps/12-staff-operations.md)      | Staff and admin operations           | 05, 11                                    | not_started |
+| [13](./steps/13-customer-ui.md)           | Customer chat UI                     | 08, 09, 11                                | not_started |
+| [14](./steps/14-staff-ui.md)              | Staff and admin UI                   | 12, 13                                    | not_started |
+| [15](./steps/15-evaluation.md)            | Evaluation harness                   | 06, 07, 09                                | not_started |
+| [16](./steps/16-security-verification.md) | Security verification                | 04 through the latest merged product step | not_started |
+| [17](./steps/17-observability.md)         | Reliability and observability        | 09, 11                                    | not_started |
+| [18](./steps/18-cloud-deployment.md)      | Cloud deployment                     | 02, 17                                    | not_started |
+| [19](./steps/19-assessment.md)            | Assessment readiness                 | the deployed slice                        | not_started |
 
 ## What the three-day review has to show
 
