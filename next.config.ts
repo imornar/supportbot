@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Keep the repository AGENTS.md. Next's generator would replace it on dev.
   agentRules: false,
+  serverExternalPackages: ["pg"],
   turbopack: {
     rules: {
       "*.css": {

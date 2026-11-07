@@ -6,10 +6,14 @@ const healthSchema = z
   })
   .strict();
 
+export const databaseStates = ["up", "down", "not_configured"] as const;
+
+export type DatabaseState = (typeof databaseStates)[number];
+
 const readinessSchema = z
   .object({
     status: z.enum(["ready", "not_ready"]),
-    database: z.enum(["configured", "not_configured"]),
+    database: z.enum(databaseStates),
   })
   .strict();
 
@@ -20,11 +24,9 @@ export function healthBody(): HealthBody {
   return healthSchema.parse({ status: "ok" });
 }
 
-export function readinessBody(
-  database: "configured" | "not_configured",
-): ReadinessBody {
+export function readinessBody(database: DatabaseState): ReadinessBody {
   return readinessSchema.parse({
-    status: database === "configured" ? "ready" : "not_ready",
+    status: database === "up" ? "ready" : "not_ready",
     database,
   });
 }
