@@ -17,7 +17,7 @@ describe("client and server boundary", () => {
         },
         {
           path: path.join(srcRoot, "app", "panel.tsx"),
-          source: `"use client";\nimport { databaseReadiness } from "../server/env";\n`,
+          source: `"use client";\nimport { databaseUrlConfigured } from "../server/env";\n`,
         },
       ],
       srcRoot,

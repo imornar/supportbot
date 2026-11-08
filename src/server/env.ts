@@ -31,14 +31,11 @@ export function getPublicEnv(): PublicEnv {
   return parsePublicEnv(process.env);
 }
 
-export function databaseReadiness(
+export function databaseUrlConfigured(
   source: Record<string, string | undefined> = process.env,
-): "configured" | "not_configured" {
+): boolean {
   const value = source.DATABASE_URL;
-  if (typeof value === "string" && value.trim().length > 0) {
-    return "configured";
-  }
-  return "not_configured";
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isHttpUrl(value: string): boolean {

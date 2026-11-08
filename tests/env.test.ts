@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { databaseReadiness, parsePublicEnv } from "@/server/env";
+import { databaseUrlConfigured, parsePublicEnv } from "@/server/env";
 
 function errorMessage(source: Record<string, string | undefined>): string {
   try {
@@ -44,15 +44,15 @@ describe("parsePublicEnv", () => {
   });
 });
 
-describe("databaseReadiness", () => {
-  it("reports that the database is not configured when DATABASE_URL is absent", () => {
-    expect(databaseReadiness({})).toBe("not_configured");
-    expect(databaseReadiness({ DATABASE_URL: "   " })).toBe("not_configured");
+describe("databaseUrlConfigured", () => {
+  it("is false when DATABASE_URL is absent", () => {
+    expect(databaseUrlConfigured({})).toBe(false);
+    expect(databaseUrlConfigured({ DATABASE_URL: "   " })).toBe(false);
   });
 
-  it("reports configured without returning the connection string", () => {
-    expect(databaseReadiness({ DATABASE_URL: plantedDatabaseUrl })).toBe(
-      "configured",
+  it("is true when a URL is present and does not return that URL", () => {
+    expect(databaseUrlConfigured({ DATABASE_URL: plantedDatabaseUrl })).toBe(
+      true,
     );
   });
 });
