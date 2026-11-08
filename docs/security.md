@@ -71,16 +71,26 @@ The flag alone does not enable the switch. Production configuration rejects the 
 
 An audit row stores the tenant, the actor user, a short action, a target type, and a target id. There is no JSON payload column. `parseAuditEvent` rejects extra fields, so a caller cannot attach a note, token, or document body. Action and target type are limited to short machine-readable strings.
 
-Audit rows are append-only in intent. The foreign keys use `ON DELETE RESTRICT`, so deleting a tenant or actor does not erase history. This step has no delete path.
+Audit rows are append-only in intent. The foreign keys use `ON DELETE RESTRICT`, so deleting a tenant or actor does not erase history. There is still no delete path for audit rows. A failed reindex may delete chunk rows for that document version. The document row stays.
+
+## Documents
+
+`POST /api/v1/documents` takes a tenant id in the JSON body. That id only selects which membership `requirePermission` loads. The insert uses the tenant id from the grant. Reads take `tenantId` as a query parameter and then filter `documents.tenant_id` and `document_chunks.tenant_id` in SQL. A document id from another tenant is a 404 after the caller has permission in the tenant they named.
+
+The body is untrusted text. The server does not render it, fetch `source`, or pass it to anything except the embedding provider and the database. Chunking is a string split. Audit rows record the actor, the action, and the document id. They do not store the body, the chunk text, or the provider error. Ingestion failures persist one of: `too_large_for_sync_ingestion`, `embedding_not_configured`, `embedding_failed`, `ingestion_failed`.
+
+`OPENAI_API_KEY` stays server-only. Preview and production do not fall back to the fake embedder. A missing key there fails the document instead of storing invented vectors.
 
 ## Retention
 
-No customer content, conversation, ticket, or document body exists yet.
+Conversations and tickets are not stored yet. Document text is.
 
 What this schema stores, and how long it is meant to live:
 
 - Tenants, users, memberships, and role assignments stay until an operator deactivates the membership or a later step defines deletion. Deactivation is a status. This step does not delete users to remove access.
 - Audit events are kept for the life of the tenant record. They are not a place to store message text, document text, or secrets.
-- Conversations, tickets, and uploads are not in this migration. When they arrive, they need their own retention notes. The expectation to carry forward is: keep them with the tenant, do not log their contents by default, and do not delete them as a side effect of a membership change.
+- Document rows and chunks stay when a version is superseded or retired. Retirement and supersession clear `is_current`. They do not delete the text or the audit row. A failed reindex deletes that version's chunk rows so a failed document has no vectors. The source text remains, and a later reindex can rebuild the chunks.
+- Do not log document bodies or embedding errors. Provider exceptions can echo the input.
+- Conversations and tickets are not in this migration. When they arrive, keep them with the tenant, do not log their contents by default, and do not delete them as a side effect of a membership change.
 
 Development seed data uses fixed example identities and no passwords. `npm run db:seed` refuses `NODE_ENV=production`, any Vercel runtime, and Vercel preview or production. The seed is not a migration and must not be pointed at a production database.

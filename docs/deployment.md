@@ -13,7 +13,7 @@ Node.js `26.x` is the version Vercel uses by default for new projects, and it is
 3. Copy `.env.example` to `.env.local`. The sample `DATABASE_URL` matches Compose. Set `NEXT_PUBLIC_APP_URL` to the local origin, usually `http://localhost:3000`.
 4. `npm install`
 5. `npm run db:migrate`
-6. `npm run db:seed` loads two local tenants and example users. It stores no passwords. It refuses production, preview, and any Vercel runtime. Skip it if you do not need the sample identities.
+6. `npm run db:seed` loads two local tenants and example users. It stores no passwords. It refuses production, preview, and any Vercel runtime. Skip it if you do not need the sample identities. Sample articles for manual upload live in `fixtures/knowledge/harbor/`. The seed does not load them.
 7. For the development identity switch, set `SUPPORTPILOT_ALLOW_DEV_IDENTITY=true` in `.env.local`. `npm run dev` is the process that honors it. `next start` sets `NODE_ENV=production` and rejects the switch.
 8. GitHub login needs `AUTH_SECRET`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET`. The OAuth callback is `http://localhost:3000/api/auth/callback/github`. This repository does not ship those credentials.
 9. `npm run dev`
@@ -31,6 +31,8 @@ When the project exists, set `DATABASE_URL` in Vercel to the Neon pooled connect
 `AUTH_SECRET` signs the Auth.js session. Preview and production each get their own value. `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET` are the GitHub OAuth app for that environment. GitHub allows one callback URL per app, so a preview host that should accept login needs its own app. Leave `AUTH_URL` unset on Vercel. Setting it to the production origin would send preview callbacks there.
 
 `SUPPORTPILOT_ALLOW_DEV_IDENTITY` stays unset on Vercel. Production configuration rejects the development identity header, cookie, and query parameter even if the variable is `true`.
+
+`OPENAI_API_KEY` is optional for local ingestion. The placeholder in `.env.example` selects the fake embedder. Preview and production need a real key or document ingestion fails closed. The key is server-only.
 
 ## Preview
 

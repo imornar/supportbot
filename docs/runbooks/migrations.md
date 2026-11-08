@@ -2,7 +2,7 @@
 
 Migrations are a deliberate operation. The Next.js process does not run them on startup, on a cold start, or from a readiness check.
 
-Drizzle Kit applies SQL files in `drizzle/` and records them in `public.__drizzle_migrations`. The first migration enables the `vector` extension. Do not create that extension by hand. The next migration creates tenants, users, memberships, role assignments, and audit events. A later migration adds `users.auth_provider` and `users.auth_subject` for the GitHub subject. Development seed data is not in those files. Load it with `npm run db:seed` only against a local database. See [`docs/security.md`](../security.md).
+Drizzle Kit applies SQL files in `drizzle/` and records them in `public.__drizzle_migrations`. The first migration enables the `vector` extension. Do not create that extension by hand. The next migration creates tenants, users, memberships, role assignments, and audit events. A later migration adds `users.auth_provider` and `users.auth_subject` for the GitHub subject. `0003_document_ingestion` adds `documents` and `document_chunks`, including a `vector(1536)` column. Development seed data is not in those files. Load it with `npm run db:seed` only against a local database. See [`docs/security.md`](../security.md).
 
 ## Connection strings
 

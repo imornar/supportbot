@@ -67,11 +67,15 @@ describe.skipIf(!databaseUrl)("postgres", () => {
           'users',
           'tenant_memberships',
           'role_assignments',
-          'audit_events'
+          'audit_events',
+          'documents',
+          'document_chunks'
         )
     `);
     expect(tables.rows.map((row) => row.tablename).sort()).toEqual([
       "audit_events",
+      "document_chunks",
+      "documents",
       "role_assignments",
       "tenant_memberships",
       "tenants",

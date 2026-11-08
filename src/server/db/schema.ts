@@ -1,8 +1,12 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
+  customType,
+  date,
   foreignKey,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -36,6 +40,47 @@ export const appRole = pgEnum("app_role", [
   "support_agent",
   "tenant_admin",
 ]);
+
+export const documentType = pgEnum("document_type", ["markdown", "text"]);
+
+export const documentPublication = pgEnum("document_publication", [
+  "draft",
+  "published",
+  "retired",
+]);
+
+export const ingestionStatus = pgEnum("ingestion_status", [
+  "pending",
+  "ready",
+  "failed",
+]);
+
+export const embeddingDimensions = 1536;
+
+const embeddingVector = customType<{
+  data: number[];
+  driverData: string;
+  config: { dimensions: number };
+  configRequired: true;
+}>({
+  dataType(config) {
+    return `vector(${config.dimensions})`;
+  },
+  toDriver(value: number[]) {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value: string) {
+    const trimmed = value.trim();
+    const inner =
+      trimmed.startsWith("[") && trimmed.endsWith("]")
+        ? trimmed.slice(1, -1)
+        : trimmed;
+    if (!inner) {
+      return [];
+    }
+    return inner.split(",").map((part) => Number(part));
+  },
+});
 
 function timestamps() {
   return {
@@ -210,6 +255,167 @@ export const auditEvents = pgTable(
     check(
       "audit_events_target_type_shape",
       sql`${table.targetType} ~ '^[a-z][a-z0-9_]{0,63}$'`,
+    ),
+  ],
+);
+
+/**
+ * Knowledge documents live in Postgres. The body is untrusted text. Nothing
+ * in this table is executed, and local disk is not the store.
+ * `is_current` marks the live row for a checksum. A new version clears it on
+ * the previous row. Retirement clears it too, so the same text can be stored
+ * again later. Queries still have to filter on tenant id.
+ */
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    title: text("title").notNull(),
+    source: text("source").notNull(),
+    documentType: documentType("document_type").notNull(),
+    version: integer("version").notNull(),
+    publication: documentPublication("publication").notNull().default("draft"),
+    checksum: text("checksum").notNull(),
+    body: text("body").notNull(),
+    uploadedByUserId: uuid("uploaded_by_user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    effectiveDate: date("effective_date", { mode: "string" }),
+    ingestionStatus: ingestionStatus("ingestion_status")
+      .notNull()
+      .default("pending"),
+    failureReason: text("failure_reason"),
+    isCurrent: boolean("is_current").notNull().default(true),
+    supersedesDocumentId: uuid("supersedes_document_id"),
+    retiredAt: timestamp("retired_at", { withTimezone: true, mode: "date" }),
+    ...timestamps(),
+  },
+  (table) => [
+    unique("documents_id_tenant_unique").on(table.id, table.tenantId),
+    unique("documents_id_version_unique").on(table.id, table.version),
+    uniqueIndex("documents_current_checksum_unique")
+      .on(table.tenantId, table.checksum)
+      .where(sql`${table.isCurrent} = true`),
+    index("documents_tenant_id_idx").on(table.tenantId),
+    foreignKey({
+      name: "documents_supersedes_tenant_fk",
+      columns: [table.supersedesDocumentId, table.tenantId],
+      foreignColumns: [table.id, table.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check(
+      "documents_title_length",
+      sql`char_length(${table.title}) between 1 and 200`,
+    ),
+    check(
+      "documents_source_length",
+      sql`char_length(${table.source}) between 1 and 500`,
+    ),
+    check("documents_version_positive", sql`${table.version} >= 1`),
+    check(
+      "documents_checksum_shape",
+      sql`${table.checksum} ~ '^[a-f0-9]{64}$'`,
+    ),
+    check(
+      "documents_body_size",
+      sql`octet_length(${table.body}) between 1 and 262144`,
+    ),
+    check(
+      "documents_not_self_supersede",
+      sql`${table.supersedesDocumentId} is null or ${table.supersedesDocumentId} <> ${table.id}`,
+    ),
+    check(
+      "documents_retired_not_current",
+      sql`${table.publication} <> 'retired' or ${table.isCurrent} = false`,
+    ),
+    check(
+      "documents_failure_reason",
+      sql`(
+        ${table.ingestionStatus} = 'failed'
+        and ${table.failureReason} in (
+          'too_large_for_sync_ingestion',
+          'embedding_not_configured',
+          'embedding_failed',
+          'ingestion_failed'
+        )
+      ) or (
+        ${table.ingestionStatus} <> 'failed' and ${table.failureReason} is null
+      )`,
+    ),
+  ],
+);
+
+export const documentChunks = pgTable(
+  "document_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    documentId: uuid("document_id").notNull(),
+    documentVersion: integer("document_version").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    section: text("section"),
+    content: text("content").notNull(),
+    embedding: embeddingVector("embedding", {
+      dimensions: embeddingDimensions,
+    }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("document_chunks_document_index_unique").on(
+      table.documentId,
+      table.chunkIndex,
+    ),
+    index("document_chunks_tenant_document_idx").on(
+      table.tenantId,
+      table.documentId,
+    ),
+    index("document_chunks_embedding_hnsw").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops"),
+    ),
+    foreignKey({
+      name: "document_chunks_document_tenant_fk",
+      columns: [table.documentId, table.tenantId],
+      foreignColumns: [documents.id, documents.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "document_chunks_document_version_fk",
+      columns: [table.documentId, table.documentVersion],
+      foreignColumns: [documents.id, documents.version],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check("document_chunks_index_non_negative", sql`${table.chunkIndex} >= 0`),
+    check(
+      "document_chunks_version_positive",
+      sql`${table.documentVersion} >= 1`,
+    ),
+    check(
+      "document_chunks_content_length",
+      sql`char_length(${table.content}) between 1 and 2000`,
+    ),
+    check(
+      "document_chunks_section_length",
+      sql`${table.section} is null or char_length(${table.section}) between 1 and 500`,
     ),
   ],
 );
