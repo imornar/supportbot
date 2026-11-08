@@ -13,7 +13,7 @@ Node.js `26.x` is the version Vercel uses by default for new projects, and it is
 3. Copy `.env.example` to `.env.local`. The sample `DATABASE_URL` matches Compose. Set `NEXT_PUBLIC_APP_URL` to the local origin, usually `http://localhost:3000`.
 4. `npm install`
 5. `npm run db:migrate`
-6. `npm run db:seed` loads two local tenants and example users. It stores no passwords. It refuses production, preview, and any Vercel runtime. Skip it if you do not need the sample identities.
+6. `npm run db:seed` loads two local tenants and example users. It stores no passwords. It refuses production, preview, and any Vercel runtime. Skip it if you do not need the sample identities. Sample articles for manual upload live in `fixtures/knowledge/harbor/`. The seed does not load them.
 7. For the development identity switch, set `SUPPORTPILOT_ALLOW_DEV_IDENTITY=true` in `.env.local`. `npm run dev` is the process that honors it. `next start` sets `NODE_ENV=production` and rejects the switch.
 8. GitHub login needs `AUTH_SECRET`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET`. The OAuth callback is `http://localhost:3000/api/auth/callback/github`. This repository does not ship those credentials.
 9. `npm run dev`
