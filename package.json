@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "node --env-file-if-exists=.env.local --env-file-if-exists=.env ./node_modules/drizzle-kit/bin.cjs generate",
-    "db:migrate": "node --env-file-if-exists=.env.local --env-file-if-exists=.env ./node_modules/drizzle-kit/bin.cjs migrate"
+    "db:migrate": "node --env-file-if-exists=.env.local --env-file-if-exists=.env ./node_modules/drizzle-kit/bin.cjs migrate",
+    "db:seed": "node --experimental-strip-types --import ./scripts/register-alias.mjs --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/seed-dev.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",

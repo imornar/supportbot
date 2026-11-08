@@ -3,11 +3,13 @@ import "server-only";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool, type PoolConfig } from "pg";
 
+import * as schema from "@/server/db/schema";
+
 const connectionTimeoutMillis = 2_000;
 const queryTimeoutMillis = 2_000;
 
 let pool: Pool | undefined;
-let database: NodePgDatabase | undefined;
+let database: NodePgDatabase<typeof schema> | undefined;
 
 export function poolConfig(connectionString: string): PoolConfig {
   const onVercel = process.env.VERCEL === "1";
@@ -34,8 +36,8 @@ export function getPool(): Pool {
   return pool;
 }
 
-export function getDb(): NodePgDatabase {
-  database ??= drizzle({ client: getPool() });
+export function getDb(): NodePgDatabase<typeof schema> {
+  database ??= drizzle({ client: getPool(), schema });
   return database;
 }
 

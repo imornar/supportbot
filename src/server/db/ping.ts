@@ -1,11 +1,15 @@
 import "server-only";
 
-import { sql } from "drizzle-orm";
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { sql, type SQL } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { logDatabaseFailure, poolConfig } from "@/server/db/client";
 
-export async function pingDatabase(db: NodePgDatabase): Promise<"up" | "down"> {
+type Queryable = {
+  execute: (query: SQL) => Promise<unknown>;
+};
+
+export async function pingDatabase(db: Queryable): Promise<"up" | "down"> {
   try {
     await db.execute(sql`select 1`);
     return "up";

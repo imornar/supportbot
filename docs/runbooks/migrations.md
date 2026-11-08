@@ -2,7 +2,7 @@
 
 Migrations are a deliberate operation. The Next.js process does not run them on startup, on a cold start, or from a readiness check.
 
-Drizzle Kit applies SQL files in `drizzle/` and records them in `public.__drizzle_migrations`. The first migration enables the `vector` extension. Do not create that extension by hand.
+Drizzle Kit applies SQL files in `drizzle/` and records them in `public.__drizzle_migrations`. The first migration enables the `vector` extension. Do not create that extension by hand. The next migration creates tenants, users, memberships, role assignments, and audit events. Development seed data is not in those files. Load it with `npm run db:seed` only against a local database. See [`docs/security.md`](../security.md).
 
 ## Connection strings
 
@@ -24,7 +24,7 @@ Local Docker:
 3. Copy `.env.example` to `.env.local` if you have not already. The sample `DATABASE_URL` matches Compose.
 4. `npm run db:migrate`
 
-The migrate command reads `.env.local`, then `.env`, and does not override variables already exported in the shell.
+The migrate command reads `.env.local`, then `.env`, and does not override variables already exported in the shell. Running it a second time applies nothing new when the migration files are unchanged.
 
 A Neon branch is an optional substitute for Docker. Use that branch's pooled string as `DATABASE_URL` and its direct string as `DIRECT_URL`, then run the same migrate command. Creating the Neon project is not part of this step.
 

@@ -8,8 +8,8 @@ Status values: `not_started`, `in_progress`, `in_review`, `done`.
 | ----------------------------------------- | ------------------------------------ | ----------------------------------------- | ----------- |
 | [00](./steps/00-repository-foundation.md) | Repository and agent workflow        | none                                      | done        |
 | [01](./steps/01-nextjs-foundation.md)     | Next.js application foundation       | 00                                        | done        |
-| [02](./steps/02-database-pgvector.md)     | PostgreSQL, Drizzle, and pgvector    | 01                                        | in_review   |
-| [03](./steps/03-tenant-audit-schema.md)   | Tenant, membership, and audit schema | 02                                        | not_started |
+| [02](./steps/02-database-pgvector.md)     | PostgreSQL, Drizzle, and pgvector    | 01                                        | done        |
+| [03](./steps/03-tenant-audit-schema.md)   | Tenant, membership, and audit schema | 02                                        | in_review   |
 | [04](./steps/04-auth-and-permissions.md)  | Authentication and permissions       | 03                                        | not_started |
 | [05](./steps/05-document-ingestion.md)    | Document ingestion                   | 04                                        | not_started |
 | [06](./steps/06-retrieval.md)             | Tenant-scoped retrieval              | 05                                        | not_started |
