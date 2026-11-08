@@ -32,6 +32,8 @@ When the project exists, set `DATABASE_URL` in Vercel to the Neon pooled connect
 
 `SUPPORTPILOT_ALLOW_DEV_IDENTITY` stays unset on Vercel. Production configuration rejects the development identity header, cookie, and query parameter even if the variable is `true`.
 
+`OPENAI_API_KEY` is optional for local ingestion. The placeholder in `.env.example` selects the fake embedder. Preview and production need a real key or document ingestion fails closed. The key is server-only.
+
 ## Preview
 
 - A Vercel preview deployment for the pull request.
