@@ -16,7 +16,8 @@ import {
  * Ownership model for later tables.
  *
  * `users` are global identity records. They have no password column and no
- * tenant id. Tenant ownership starts at `tenant_memberships`. A role
+ * tenant id. Auth.js stores the provider name and provider subject here after
+ * a verified link. Tenant ownership starts at `tenant_memberships`. A role
  * assignment stores the same tenant id as its membership, and the composite
  * foreign key rejects a role in tenant B for a membership in tenant A.
  *
@@ -74,10 +75,16 @@ export const users = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").notNull(),
     displayName: text("display_name").notNull(),
+    authProvider: text("auth_provider"),
+    authSubject: text("auth_subject"),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex("users_email_unique").on(table.email),
+    uniqueIndex("users_auth_identity_unique").on(
+      table.authProvider,
+      table.authSubject,
+    ),
     check(
       "users_email_normalized",
       sql`${table.email} = lower(${table.email}) and ${table.email} ~ '^[^@[:space:]]+@[^@[:space:]]+$' and char_length(${table.email}) <= 320`,
@@ -85,6 +92,25 @@ export const users = pgTable(
     check(
       "users_display_name_length",
       sql`char_length(${table.displayName}) between 1 and 120`,
+    ),
+    check(
+      "users_auth_identity_pair",
+      sql`(
+        ${table.authProvider} is null and ${table.authSubject} is null
+      ) or (
+        ${table.authProvider} is not null and ${table.authSubject} is not null
+      )`,
+    ),
+    check(
+      "users_auth_provider_shape",
+      sql`${table.authProvider} is null or ${table.authProvider} ~ '^[a-z][a-z0-9_-]{0,31}$'`,
+    ),
+    check(
+      "users_auth_subject_shape",
+      sql`${table.authSubject} is null or (
+        char_length(${table.authSubject}) between 1 and 255
+        and ${table.authSubject} !~ '[[:space:]]'
+      )`,
     ),
   ],
 );

@@ -4,6 +4,11 @@ import { defineConfig } from "vitest/config";
 const root = import.meta.dirname;
 
 export default defineConfig({
+  ssr: {
+    // Auth.js imports `next/server` without a file extension. Vite must bundle
+    // that import so the test runner can resolve Next's package entry.
+    noExternal: ["next-auth"],
+  },
   test: {
     environment: "node",
   },

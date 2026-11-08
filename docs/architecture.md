@@ -8,11 +8,11 @@ SupportPilot is one Next.js application. The browser, route handlers, and server
 - Server modules live under `src/server`. Modules that read secrets import `server-only`, so a client component build fails if it imports them.
 - A test walks `src` and fails when a `"use client"` file imports `server-only` or `src/server`.
 - The model is not part of this step. When it arrives, it still does not get a database connection or a free choice of tools.
-- Tenant ownership is a column plus a query filter. `users` are global identities with no password. Membership and role rows carry the tenant id, and a role assignment cannot name a different tenant from its membership. Query helpers take a tenant id and filter in SQL. Row Level Security is deferred for the pooled connection. The conditions are in [`docs/security.md`](security.md).
+- Tenant ownership is a column plus a query filter. `users` are global identities with no password. Auth.js maps a GitHub subject onto a user. Membership and role rows carry the tenant id, and a role assignment cannot name a different tenant from its membership. `requirePermission` loads those roles for the resource tenant on each request. Query helpers take a tenant id and filter in SQL. Row Level Security is deferred for the pooled connection. The conditions are in [`docs/security.md`](security.md).
 
 ## Environment
 
-`NEXT_PUBLIC_APP_URL` is the only required variable. It is public by definition. Server secrets such as `DATABASE_URL` and `OPENAI_API_KEY` stay unprefixed and are optional until the step that uses them. Validation errors name the field and omit the value.
+`NEXT_PUBLIC_APP_URL` is the only variable required to render the home page. It is public by definition. `AUTH_SECRET`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET` stay unprefixed. A real GitHub login needs them. The development identity switch does not. Server secrets such as `DATABASE_URL` and `OPENAI_API_KEY` stay unprefixed. Validation errors name the field and omit the value.
 
 ## Serverless limits later steps have to respect
 

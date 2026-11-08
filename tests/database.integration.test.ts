@@ -101,6 +101,8 @@ describe.skipIf(!databaseUrl)("postgres", () => {
     expect(names).toEqual(
       expect.arrayContaining([
         "users.email",
+        "users.auth_provider",
+        "users.auth_subject",
         "audit_events.tenant_id",
         "audit_events.actor_user_id",
         "audit_events.action",
