@@ -34,6 +34,8 @@ When the project exists, set `DATABASE_URL` in Vercel to the Neon pooled connect
 
 `OPENAI_API_KEY` is optional for local ingestion. The placeholder in `.env.example` selects the fake embedder. Preview and production need a real key or document ingestion fails closed. The key is server-only.
 
+`RETRIEVAL_TOP_K` and `RETRIEVAL_SIMILARITY_THRESHOLD` are optional. Unset, they are 5 and 0.3. A deployment can leave them unset. They are not secrets and must not use the `NEXT_PUBLIC_` prefix. Changing them does not require a migration.
+
 ## Preview
 
 - A Vercel preview deployment for the pull request.

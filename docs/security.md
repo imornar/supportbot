@@ -81,6 +81,14 @@ The body is untrusted text. The server does not render it, fetch `source`, or pa
 
 `OPENAI_API_KEY` stays server-only. Preview and production do not fall back to the fake embedder. A missing key there fails the document instead of storing invented vectors.
 
+## Retrieval
+
+`retrieveEvidence` takes the tenant id as an argument. That id has to be the one the server already resolved from the session and the membership. The function does not accept a request body, and this step adds no route that could. The filter in the query is `document_chunks.tenant_id = <that id>`. The join requires the document's tenant to equal the chunk's tenant. It does not repeat the caller's tenant as a second parameter, so removing the chunk predicate is what lets another tenant's rows through. The cross-tenant test stores the same embedding in two tenants and expects only the caller's chunk.
+
+Drafts, retired rows, superseded versions (`is_current = false`), failed ingestion, and documents whose effective date is still in the future are excluded in that same query. Chunk text is returned as evidence. A chunk that says to ignore tenant filters is still just text. The query does not read instructions out of it.
+
+Top-k and the similarity threshold come from `RETRIEVAL_TOP_K` and `RETRIEVAL_SIMILARITY_THRESHOLD`. When those variables are unset, the defaults are 5 and 0.3. They are not constants inside a route handler. There is no route handler yet.
+
 ## Retention
 
 Conversations and tickets are not stored yet. Document text is.
