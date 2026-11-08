@@ -1,3 +1,6 @@
+import Link from "next/link";
+
+import { devIdentityEnabled } from "@/server/auth/dev-identity";
 import { getPublicEnv } from "@/server/env";
 
 export default function HomePage() {
@@ -9,8 +12,9 @@ export default function HomePage() {
         <p className="text-sm font-medium text-zinc-500">SupportPilot</p>
         <h1 className="text-4xl font-semibold tracking-tight">SupportPilot</h1>
         <p className="max-w-xl text-lg text-zinc-600 dark:text-zinc-400">
-          Multi-tenant AI customer support. This foundation serves the app and
-          its health checks. Documents, auth, and answers come in later steps.
+          Multi-tenant AI customer support. Sign in with GitHub, or use a seeded
+          development identity when that switch is enabled. Documents and
+          answers come in later steps.
         </p>
       </div>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -29,6 +33,22 @@ export default function HomePage() {
         >
           Readiness
         </a>
+        {/* Auth.js starts OAuth with a redirect. A client-side Link prefetch is the wrong request. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a
+          className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700"
+          href="/api/auth/signin/github"
+        >
+          Sign in
+        </a>
+        {devIdentityEnabled(process.env) ? (
+          <Link
+            className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700"
+            href="/dev/identity"
+          >
+            Development identity
+          </Link>
+        ) : null}
       </div>
     </main>
   );

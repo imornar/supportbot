@@ -67,6 +67,8 @@ describe(".env.example", () => {
       "DATABASE_URL",
       "OPENAI_API_KEY",
       "AUTH_SECRET",
+      "AUTH_GITHUB_ID",
+      "AUTH_GITHUB_SECRET",
       "SENTRY_DSN",
     ]) {
       expect(example).not.toContain(`NEXT_PUBLIC_${name}`);

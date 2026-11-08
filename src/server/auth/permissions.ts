@@ -1,7 +1,8 @@
 /**
- * Permission names from spec section 6. Enforcement arrives in Step 04.
+ * Permission names from spec section 6.
  * A role is not a superset of the roles below it. A person who needs two
  * jobs holds two role assignments, and the check uses the union.
+ * `requirePermission` loads that union from the database on each request.
  */
 
 export const permissions = [
