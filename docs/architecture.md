@@ -8,6 +8,7 @@ SupportPilot is one Next.js application. The browser, route handlers, and server
 - Server modules live under `src/server`. Modules that read secrets import `server-only`, so a client component build fails if it imports them.
 - A test walks `src` and fails when a `"use client"` file imports `server-only` or `src/server`.
 - The model is not part of this step. When it arrives, it still does not get a database connection or a free choice of tools.
+- Tenant ownership is a column plus a query filter. `users` are global identities with no password. Membership and role rows carry the tenant id, and a role assignment cannot name a different tenant from its membership. Query helpers take a tenant id and filter in SQL. Row Level Security is deferred for the pooled connection. The conditions are in [`docs/security.md`](security.md).
 
 ## Environment
 

@@ -13,7 +13,8 @@ Node.js `26.x` is the version Vercel uses by default for new projects, and it is
 3. Copy `.env.example` to `.env.local`. The sample `DATABASE_URL` matches Compose. Set `NEXT_PUBLIC_APP_URL` to the local origin, usually `http://localhost:3000`.
 4. `npm install`
 5. `npm run db:migrate`
-6. `npm run dev`
+6. `npm run db:seed` loads two local tenants and example users. It stores no passwords. It refuses production, preview, and any Vercel runtime. Skip it if you do not need the sample identities.
+7. `npm run dev`
 
 The app builds with no live database. `NEXT_PUBLIC_APP_URL` is required because the home page reads it on the server. Health does not. Readiness opens a short database check only when the route is called.
 
