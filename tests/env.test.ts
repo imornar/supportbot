@@ -70,9 +70,13 @@ describe(".env.example", () => {
       "AUTH_GITHUB_ID",
       "AUTH_GITHUB_SECRET",
       "SENTRY_DSN",
+      "RETRIEVAL_TOP_K",
+      "RETRIEVAL_SIMILARITY_THRESHOLD",
     ]) {
       expect(example).not.toContain(`NEXT_PUBLIC_${name}`);
     }
     expect(example).toContain("NEXT_PUBLIC_APP_URL=");
+    expect(example).toContain("RETRIEVAL_TOP_K=");
+    expect(example).toContain("RETRIEVAL_SIMILARITY_THRESHOLD=");
   });
 });
