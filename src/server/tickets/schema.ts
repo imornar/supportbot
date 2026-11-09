@@ -90,9 +90,7 @@ export type StaffTicket = z.infer<typeof staffTicketSchema>;
 export type TicketSummary = z.infer<typeof ticketSummarySchema>;
 export type TicketAudience = "customer" | "agent" | "queue";
 
-export function parseTicketListFilters(
-  url: URL,
-):
+export function parseTicketListFilters(url: URL):
   | {
       ok: true;
       status?: (typeof ticketStatuses)[number];
