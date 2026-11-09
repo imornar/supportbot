@@ -12,6 +12,7 @@ import type { OrderSummary } from "@/server/orders/types";
 import {
   clarificationMessage,
   humanEscalationMessage,
+  humanEscalationMessageFor,
   orderRefusalMessage,
   orderUnavailableMessage,
   signInForOrderMessage,
@@ -110,6 +111,15 @@ describe("support workflow graph", () => {
     expect(result.body).toBe(humanEscalationMessage);
     expect(result.citations).toEqual([]);
     expect(result.modelId).toBeNull();
+  });
+
+  it("puts the tenant support name in the escalation sentence", async () => {
+    const result = await runSupportWorkflow({
+      question: "Please talk to a human",
+      context: { ...context(calls()), supportName: "Harbor Desk" },
+    });
+    expect(result.body).toBe(humanEscalationMessageFor("Harbor Desk"));
+    expect(result.body).not.toMatch(/\bhas accepted\b/);
   });
 
   it("does not call a tool map attached beside the context", async () => {
@@ -417,6 +427,7 @@ function context(
       return Promise.resolve(options?.evidence ?? []);
     },
     orderAccess: options?.orderAccess ?? { mode: "unregistered" },
+    supportName: "A support agent",
   };
 }
 

@@ -18,6 +18,7 @@ import {
   reopenTransition,
   replyTransition,
   resolveTransition,
+  type TicketPriority,
   type TicketReason,
   type TicketSnapshot,
   type TicketStatus,
@@ -173,7 +174,11 @@ export async function createCustomerTicket(
   });
 }
 
-export async function listTickets(db: TenantQueryClient, actor: TicketActor) {
+export async function listTickets(
+  db: TenantQueryClient,
+  actor: TicketActor,
+  filter: { status?: TicketStatus; priority?: TicketPriority } = {},
+) {
   const rows = await db
     .select({
       id: tickets.id,
@@ -195,6 +200,8 @@ export async function listTickets(db: TenantQueryClient, actor: TicketActor) {
         actor.audience === "customer"
           ? eq(tickets.requesterUserId, actor.userId)
           : undefined,
+        filter.status ? eq(tickets.status, filter.status) : undefined,
+        filter.priority ? eq(tickets.priority, filter.priority) : undefined,
       ),
     )
     .orderBy(desc(tickets.updatedAt))

@@ -22,7 +22,7 @@ import {
   openEscalationTicket,
 } from "@/server/tickets/store";
 import { createTicketHandlers } from "@/server/tickets/handlers";
-import { humanEscalationMessage } from "@/server/workflow/decision";
+import { humanEscalationMessageFor } from "@/server/workflow/decision";
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const rollback = new Error("rollback ticket test");
@@ -73,6 +73,37 @@ describe.skipIf(!databaseUrl)("tickets API", () => {
       expect(createdBody.ticket.priority).toBe("normal");
       expect(createdBody.ticket.status).toBe("open");
       const ticketId = createdBody.ticket.id;
+
+      const filtered = await handlers.list(
+        ticketRequest(
+          "GET",
+          "/api/v1/tickets?status=open&priority=normal",
+          casey,
+          harbor,
+        ),
+      );
+      expect(filtered.status).toBe(200);
+      expect(
+        (
+          (await filtered.json()) as { tickets: Array<{ id: string }> }
+        ).tickets.map((ticket) => ticket.id),
+      ).toContain(ticketId);
+
+      const otherStatus = await handlers.list(
+        ticketRequest(
+          "GET",
+          "/api/v1/tickets?status=resolved&priority=high",
+          sam,
+          harbor,
+        ),
+      );
+      expect(otherStatus.status).toBe(200);
+      expect(JSON.stringify(await otherStatus.json())).not.toContain(ticketId);
+
+      const invalidFilter = await handlers.list(
+        ticketRequest("GET", "/api/v1/tickets?status=nope", sam, harbor),
+      );
+      expect(invalidFilter.status).toBe(400);
 
       const again = await handlers.create(
         ticketRequest("POST", "/api/v1/tickets", casey, harbor, {
@@ -312,7 +343,9 @@ describe.skipIf(!databaseUrl)("tickets API", () => {
         messages: Array<{ body: string }>;
       };
       expect(modelCalls).toBe(0);
-      expect(body.messages[1]?.body).toBe(humanEscalationMessage);
+      expect(body.messages[1]?.body).toBe(
+        humanEscalationMessageFor("Harbor Goods"),
+      );
       expect(body.messages[1]?.body).not.toMatch(/\bhas accepted\b/);
       expect(body.ticket?.status).toBe("open");
 
@@ -329,7 +362,7 @@ describe.skipIf(!databaseUrl)("tickets API", () => {
         .select({ body: messages.body })
         .from(messages)
         .where(eq(messages.role, "assistant"));
-      expect(stored?.body).toBe(humanEscalationMessage);
+      expect(stored?.body).toBe(humanEscalationMessageFor("Harbor Goods"));
       expect(stored?.body).not.toMatch(/\bhas accepted\b/);
 
       const anonymous = await conversationsApi.post(

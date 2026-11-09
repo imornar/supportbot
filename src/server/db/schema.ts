@@ -100,6 +100,9 @@ export const tenants = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
+    publicSupportName: text("public_support_name")
+      .notNull()
+      .default("A support agent"),
     ...timestamps(),
   },
   (table) => [
@@ -111,6 +114,14 @@ export const tenants = pgTable(
     check(
       "tenants_name_length",
       sql`char_length(${table.name}) between 1 and 120`,
+    ),
+    check(
+      "tenants_public_support_name_length",
+      sql`char_length(${table.publicSupportName}) between 1 and 80`,
+    ),
+    check(
+      "tenants_public_support_name_shape",
+      sql`${table.publicSupportName} ~ '^[A-Za-z0-9][A-Za-z0-9 .&-]{0,79}$'`,
     ),
   ],
 );

@@ -18,11 +18,13 @@ export const seedTenants = [
     id: "11111111-1111-4111-8111-111111111111",
     slug: "harbor",
     name: "Harbor Goods",
+    publicSupportName: "Harbor Goods",
   },
   {
     id: "22222222-2222-4222-8222-222222222222",
     slug: "northwind",
     name: "Northwind Outfitters",
+    publicSupportName: "Northwind Outfitters",
   },
 ] as const;
 

@@ -20,6 +20,7 @@ import {
 } from "@/server/tickets/store";
 import {
   createTicketBodySchema,
+  parseTicketListFilters,
   ticketAudience,
   ticketReplyBodySchema,
   type TicketAudience,
@@ -77,7 +78,11 @@ export function createTicketHandlers(overrides?: Partial<TicketHandlerDeps>) {
           return tenantId;
         }
         const actor = await authorize(deps, request, "ticket:read", tenantId);
-        const tickets = await listTickets(deps.db(), actor);
+        const filters = parseTicketListFilters(new URL(request.url));
+        if (!filters.ok) {
+          return Response.json({ error: "validation_failed" }, { status: 400 });
+        }
+        const tickets = await listTickets(deps.db(), actor, filters);
         return Response.json(tickets);
       });
     },
