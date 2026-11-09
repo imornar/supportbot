@@ -13,7 +13,7 @@ Status values: `not_started`, `in_progress`, `in_review`, `done`.
 | [04](./steps/04-auth-and-permissions.md)  | Authentication and permissions       | 03                                        | in_review   |
 | [05](./steps/05-document-ingestion.md)    | Document ingestion                   | 04                                        | in_review   |
 | [06](./steps/06-retrieval.md)             | Tenant-scoped retrieval              | 05                                        | in_review   |
-| [07](./steps/07-grounded-answers.md)      | Grounded answers and citations       | 06                                        | not_started |
+| [07](./steps/07-grounded-answers.md)      | Grounded answers and citations       | 06                                        | in_review   |
 | [08](./steps/08-conversations-api.md)     | Conversations API                    | 04, 07                                    | not_started |
 | [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | not_started |
 | [10](./steps/10-order-lookup.md)          | Authorized order lookup              | 04, 09                                    | not_started |

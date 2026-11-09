@@ -32,7 +32,9 @@ When the project exists, set `DATABASE_URL` in Vercel to the Neon pooled connect
 
 `SUPPORTPILOT_ALLOW_DEV_IDENTITY` stays unset on Vercel. Production configuration rejects the development identity header, cookie, and query parameter even if the variable is `true`.
 
-`OPENAI_API_KEY` is optional for local ingestion. The placeholder in `.env.example` selects the fake embedder. Preview and production need a real key or document ingestion fails closed. The key is server-only.
+`OPENAI_API_KEY` is optional for local ingestion. The placeholder in `.env.example` selects the fake embedder. Preview and production need a real key or document ingestion fails closed. The same key is what a chat completion uses. A missing or placeholder key does not generate an answer. The key is server-only.
+
+`SUPPORTPILOT_AI_REQUEST_TIMEOUT_MS` is the per-attempt chat timeout. Unset means 10000. The allowed range is 1000 to 30000. Transient failures retry twice, so a 30000 millisecond timeout can spend about 90 seconds plus a short backoff. Lower it when the function limit is shorter than that. The value is not a secret.
 
 `RETRIEVAL_TOP_K` and `RETRIEVAL_SIMILARITY_THRESHOLD` are optional. Unset, they are 5 and 0.3. A deployment can leave them unset. They are not secrets and must not use the `NEXT_PUBLIC_` prefix. Changing them does not require a migration.
 
