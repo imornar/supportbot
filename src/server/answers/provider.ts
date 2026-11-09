@@ -101,6 +101,13 @@ export async function runBoundedAttempts<T>(
   }
 }
 
+export function chatCredentialsConfigured(
+  env: Record<string, string | undefined>,
+): boolean {
+  const key = env.OPENAI_API_KEY?.trim() ?? "";
+  return !placeholderKeys.has(key);
+}
+
 export function createChatProvider(
   env: Record<string, string | undefined>,
 ): ChatProvider {

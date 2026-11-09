@@ -20,8 +20,8 @@ Status values: `not_started`, `in_progress`, `in_review`, `done`.
 | [11](./steps/11-tickets.md)               | Tickets and escalation               | 08, 09                                    | done        |
 | [12](./steps/12-staff-operations.md)      | Staff and admin operations           | 05, 11                                    | done        |
 | [13](./steps/13-customer-ui.md)           | Customer chat UI                     | 08, 09, 11                                | done        |
-| [14](./steps/14-staff-ui.md)              | Staff and admin UI                   | 12, 13                                    | in_review   |
-| [15](./steps/15-evaluation.md)            | Evaluation harness                   | 06, 07, 09                                | not_started |
+| [14](./steps/14-staff-ui.md)              | Staff and admin UI                   | 12, 13                                    | done        |
+| [15](./steps/15-evaluation.md)            | Evaluation harness                   | 06, 07, 09                                | in_review   |
 | [16](./steps/16-security-verification.md) | Security verification                | 04 through the latest merged product step | not_started |
 | [17](./steps/17-observability.md)         | Reliability and observability        | 09, 11                                    | not_started |
 | [18](./steps/18-cloud-deployment.md)      | Cloud deployment                     | 02, 17                                    | not_started |

@@ -1,5 +1,45 @@
 # Evaluation
 
+`npm run eval` runs the versioned cases in `fixtures/evaluation/dataset.json` through the support workflow. CI runs `npm run eval -- --strict`. The gate is deterministic: retrieval ids, citation validity, abstention, escalation, and auth. Answer wording is not measured. Estimated cost stays not measured unless you pass `--live` and `OPENAI_API_KEY` is set.
+
+There is no evaluation screen. An LLM-as-judge is not the gate. A later judge could supplement these checks. It must not replace them.
+
+Without `DATABASE_URL`, retrieval and the cross-tenant case are not measured. `--strict` fails the command when a graded check was not measured, so a citation or tenant miss cannot hide as a pass. With the database, the command seeds the retrieval fixtures, adds a second tenant on the same shipping vector, and rolls the transaction back.
+
+`--live` calls the configured chat model on the live-probe cases. Embeddings stay fixtures. The live section checks that citations belong to the retrieved rows and that order lookup does not run. It records the observed outcome and a cost estimate from the list rates in `src/server/evaluation/cost.ts`. That estimate is not an invoice. CI does not pass `--live`.
+
+## Latest local fixture run
+
+Database retrieval was measured. Estimated cost was not measured. 13 cases passed, 0 incomplete, 0 failed. Latency below is from that one run and will move.
+
+| Case                    | Result | Retrieval    | Citation     | Abstention   | Escalation   | Auth | Answer text  |
+| ----------------------- | ------ | ------------ | ------------ | ------------ | ------------ | ---- | ------------ |
+| single-source           | pass   | pass         | pass         | not measured | not measured | pass | not measured |
+| multi-source            | pass   | pass         | pass         | not measured | not measured | pass | not measured |
+| missing                 | pass   | pass         | not measured | pass         | not measured | pass | not measured |
+| conflicting             | pass   | pass         | pass         | pass         | not measured | pass | not measured |
+| outdated                | pass   | pass         | not measured | pass         | not measured | pass | not measured |
+| cross-tenant            | pass   | pass         | pass         | not measured | not measured | pass | not measured |
+| question-injection      | pass   | pass         | pass         | pass         | not measured | pass | not measured |
+| document-injection      | pass   | pass         | pass         | pass         | not measured | pass | not measured |
+| unauthorized-anonymous  | pass   | not measured | not measured | not measured | not measured | pass | not measured |
+| unauthorized-role       | pass   | not measured | not measured | pass         | not measured | pass | not measured |
+| unauthorized-all-orders | pass   | not measured | not measured | pass         | not measured | pass | not measured |
+| human-request           | pass   | not measured | not measured | not measured | pass         | pass | not measured |
+| provider-failure        | pass   | pass         | pass         | pass         | not measured | pass | not measured |
+
+Answer text is not measured on every row, including the passes. A not measured cell is not a score.
+
+## What this run does not prove
+
+- It does not score whether a sentence is a good support answer. The fixture model returns scripted JSON.
+- It does not measure `text-embedding-3-small`. Query vectors are fixture axes. A live run still uses those axes, so it does not show that a new embedding model retrieves the labeled article.
+- It does not prove a live model will ignore an instruction inside a chunk. The document-injection fixture rejects a tool field. The server still stores a grounded answer when the citation is a real chunk.
+- It does not prove production latency or the provider's bill. Cost is not measured in the fixture command.
+- The articles are synthetic. Nothing in the files is customer data or a credential.
+
+To change one case during a review, edit that object in `fixtures/evaluation/dataset.json` and run `npm run eval -- --strict`. The retrieval ids for a case are `expectedDocumentKeys`. The embedding comes from the named query in `fixtures/retrieval/dataset.json`.
+
 Retrieval labels live in `fixtures/retrieval/dataset.json`. Tests load that file. Nothing in it is customer data or a secret. Grounded-answer tests use scripted model JSON. They do not call OpenAI and they do not grade wording.
 
 ## What the dataset checks
@@ -32,7 +72,7 @@ Every hit in the dataset test is read back from `document_chunks` and `documents
 
 `lexical-trap` is the hybrid check. A word overlap of tokens of four letters or more ranks `returns` first. The fixture embedding ranks `shipping` first, which is the label. Adding keyword search on this set would change a correct result into the wrong article. The articles are short and share ordinary words such as "days", so an unweighted blend is not justified by this fixture.
 
-Revisit hybrid when a sample of real `text-embedding-3-small` vectors shows a labeled miss that lexical search would fix. That belongs with the later evaluation step, not with this filter.
+Revisit hybrid when a sample of real `text-embedding-3-small` vectors shows a labeled miss that lexical search would fix. This harness does not add keyword search.
 
 ## Freshness and conflicts
 

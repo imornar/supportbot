@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "node scripts/e2e.mjs",
+    "eval": "node --experimental-strip-types --import ./scripts/register-alias.mjs --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/evaluate.ts",
     "db:generate": "node --env-file-if-exists=.env.local --env-file-if-exists=.env ./node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file-if-exists=.env.local --env-file-if-exists=.env ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:seed": "node --experimental-strip-types --import ./scripts/register-alias.mjs --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/seed-dev.ts"
