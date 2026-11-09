@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import { maxQuestionChars } from "@/server/answers/schema";
+import {
+  ticketPriorities,
+  ticketReasons,
+  ticketStatuses,
+} from "@/server/tickets/machine";
 
 /**
  * Fields a client may send on `POST /api/v1/support/messages`.
@@ -85,6 +90,15 @@ export const postMessageResponseSchema = z
     isPrivate: z.boolean(),
     replayed: z.boolean(),
     messages: z.array(messageResponseSchema).length(2),
+    ticket: z
+      .object({
+        id: z.uuid(),
+        status: z.enum(ticketStatuses),
+        reason: z.enum(ticketReasons),
+        priority: z.enum(ticketPriorities),
+      })
+      .strict()
+      .nullable(),
   })
   .strict();
 

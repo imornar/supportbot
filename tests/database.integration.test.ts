@@ -75,7 +75,9 @@ describe.skipIf(!databaseUrl)("postgres", () => {
           'orders',
           'messages',
           'support_submissions',
-          'support_rate_buckets'
+          'support_rate_buckets',
+          'tickets',
+          'ticket_messages'
         )
     `);
     expect(tables.rows.map((row) => row.tablename).sort()).toEqual([
@@ -91,6 +93,8 @@ describe.skipIf(!databaseUrl)("postgres", () => {
       "support_submissions",
       "tenant_memberships",
       "tenants",
+      "ticket_messages",
+      "tickets",
       "users",
     ]);
   });

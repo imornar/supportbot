@@ -515,8 +515,9 @@ export const documentChunks = pgTable(
  * Message text is the product record. Audit metadata on an assistant message
  * is the workflow outcome, the citation check, the model id, a short reason
  * code, the intent, and an escalation reason when the outcome is escalated.
- * There is no column for the raw provider payload. Escalation does not insert
- * a ticket. Step 11 reads the reason from this row.
+ * There is no column for the raw provider payload. A signed-in escalation
+ * also inserts a ticket. The assistant sentence is written here and is not
+ * rewritten when an agent later claims that ticket.
  */
 export const messageRole = pgEnum("message_role", ["user", "assistant"]);
 
@@ -723,10 +724,200 @@ export const messages = pgTable(
 );
 
 /**
+ * One support ticket per open escalation reason on a private conversation.
+ * `closed` is in the status enum because the spec lists it. No transition
+ * writes it. `resolved_at` stays set on `reopened` and is cleared on the
+ * next claim. Priority is fixed by the reason check below. There is no
+ * staff override column.
+ *
+ * Customer-visible replies and staff notes share `ticket_messages` and are
+ * separated by `visibility`. A customer read filters `visibility = customer`
+ * in SQL. Notes are not a column on `tickets`.
+ */
+export const ticketStatus = pgEnum("ticket_status", [
+  "open",
+  "assigned",
+  "in_progress",
+  "resolved",
+  "reopened",
+  "closed",
+]);
+
+export const ticketPriority = pgEnum("ticket_priority", [
+  "low",
+  "normal",
+  "high",
+]);
+
+export const ticketMessageVisibility = pgEnum("ticket_message_visibility", [
+  "customer",
+  "internal",
+]);
+
+const ticketReasonSql = sql`'customer_requested_human', 'insufficient_evidence', 'conflicting_sources', 'repeated_attempts', 'sensitive_request', 'business_tool_unavailable', 'workflow_failure'`;
+
+export const tickets = pgTable(
+  "tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    conversationId: uuid("conversation_id").notNull(),
+    requesterUserId: uuid("requester_user_id").notNull(),
+    reason: text("reason").notNull(),
+    priority: ticketPriority("priority").notNull(),
+    status: ticketStatus("status").notNull().default("open"),
+    assigneeUserId: uuid("assignee_user_id").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+    sourceMessageId: uuid("source_message_id"),
+    citations: jsonb("citations")
+      .$type<StoredCitation[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    claimedAt: timestamp("claimed_at", { withTimezone: true, mode: "date" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
+    ...timestamps(),
+  },
+  (table) => [
+    unique("tickets_id_tenant_unique").on(table.id, table.tenantId),
+    uniqueIndex("tickets_active_reason_unique")
+      .on(table.tenantId, table.conversationId, table.reason)
+      .where(
+        sql`${table.status} in ('open', 'assigned', 'in_progress', 'reopened')`,
+      ),
+    uniqueIndex("tickets_source_message_unique")
+      .on(table.sourceMessageId)
+      .where(sql`${table.sourceMessageId} is not null`),
+    index("tickets_tenant_status_updated_idx").on(
+      table.tenantId,
+      table.status,
+      table.updatedAt,
+    ),
+    index("tickets_tenant_requester_idx").on(
+      table.tenantId,
+      table.requesterUserId,
+    ),
+    foreignKey({
+      name: "tickets_conversation_customer_fk",
+      columns: [table.conversationId, table.tenantId, table.requesterUserId],
+      foreignColumns: [
+        conversations.id,
+        conversations.tenantId,
+        conversations.customerUserId,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "tickets_source_message_fk",
+      columns: [table.sourceMessageId, table.tenantId],
+      foreignColumns: [messages.id, messages.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check("tickets_reason", sql`${table.reason} in (${ticketReasonSql})`),
+    check(
+      "tickets_priority_matches_reason",
+      sql`(
+        ${table.reason} in ('sensitive_request', 'conflicting_sources', 'workflow_failure')
+        and ${table.priority} = 'high'
+      ) or (
+        ${table.reason} in ('customer_requested_human', 'business_tool_unavailable', 'repeated_attempts')
+        and ${table.priority} = 'normal'
+      ) or (
+        ${table.reason} = 'insufficient_evidence' and ${table.priority} = 'low'
+      )`,
+    ),
+    check(
+      "tickets_citations_array",
+      sql`jsonb_typeof(${table.citations}) = 'array' and jsonb_array_length(${table.citations}) <= 20`,
+    ),
+    check(
+      "tickets_status_timestamps",
+      sql`(
+        ${table.status} = 'open'
+        and ${table.assigneeUserId} is null
+        and ${table.claimedAt} is null
+        and ${table.resolvedAt} is null
+      ) or (
+        ${table.status} = 'assigned'
+        and ${table.assigneeUserId} is not null
+        and ${table.claimedAt} is not null
+        and ${table.resolvedAt} is null
+      ) or (
+        ${table.status} = 'in_progress'
+        and ${table.assigneeUserId} is not null
+        and ${table.claimedAt} is not null
+        and ${table.resolvedAt} is null
+      ) or (
+        ${table.status} = 'resolved'
+        and ${table.assigneeUserId} is not null
+        and ${table.claimedAt} is not null
+        and ${table.resolvedAt} is not null
+      ) or (
+        ${table.status} = 'reopened'
+        and ${table.assigneeUserId} is null
+        and ${table.claimedAt} is null
+        and ${table.resolvedAt} is not null
+      )`,
+    ),
+  ],
+);
+
+export const ticketMessages = pgTable(
+  "ticket_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    ticketId: uuid("ticket_id").notNull(),
+    authorUserId: uuid("author_user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    visibility: ticketMessageVisibility("visibility").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("ticket_messages_ticket_created_idx").on(
+      table.ticketId,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "ticket_messages_ticket_tenant_fk",
+      columns: [table.ticketId, table.tenantId],
+      foreignColumns: [tickets.id, tickets.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check(
+      "ticket_messages_body_length",
+      sql`char_length(${table.body}) between 1 and 4000`,
+    ),
+  ],
+);
+
+/**
  * One row per submit. The idempotency key is unique for a customer inside a
  * tenant, and unique for the logged-out demo inside the public tenant.
  * Pending means the model call is still in flight. Complete points at the
- * two message rows that were the original result.
+ * two message rows that were the original result. `ticket_id` is set when
+ * that turn opened or reused a ticket, so a replay returns the same id.
  */
 export const supportSubmissions = pgTable(
   "support_submissions",
@@ -747,6 +938,7 @@ export const supportSubmissions = pgTable(
     conversationId: uuid("conversation_id"),
     userMessageId: uuid("user_message_id"),
     assistantMessageId: uuid("assistant_message_id"),
+    ticketId: uuid("ticket_id"),
     ...timestamps(),
   },
   (table) => [
@@ -785,6 +977,13 @@ export const supportSubmissions = pgTable(
       name: "support_submissions_assistant_message_fk",
       columns: [table.assistantMessageId, table.tenantId],
       foreignColumns: [messages.id, messages.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "support_submissions_ticket_tenant_fk",
+      columns: [table.ticketId, table.tenantId],
+      foreignColumns: [tickets.id, tickets.tenantId],
     })
       .onDelete("restrict")
       .onUpdate("restrict"),

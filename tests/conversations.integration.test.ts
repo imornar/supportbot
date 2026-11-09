@@ -16,6 +16,7 @@ import {
   documents,
   messages,
   orders,
+  tickets,
   roleAssignments,
   tenantMemberships,
   tenants,
@@ -254,11 +255,23 @@ describe.skipIf(!databaseUrl)("conversations API", () => {
       );
       expect(response.status).toBe(201);
       const body = (await response.json()) as {
+        ticket: { status: string; reason: string; priority: string } | null;
         messages: Array<{ role: string; outcome: string | null; body: string }>;
       };
       expect(body.messages[1]?.outcome).toBe("escalated");
       expect(body.messages[1]?.body).toBe(humanEscalationMessage);
+      expect(body.messages[1]?.body).not.toMatch(/\bhas accepted\b/);
+      expect(body.ticket).toMatchObject({
+        status: "open",
+        reason: "customer_requested_human",
+        priority: "normal",
+      });
       expect(modelCalls).toBe(0);
+      const ticketRows = await tx
+        .select({ id: tickets.id })
+        .from(tickets)
+        .where(eq(tickets.tenantId, fixture.tenantA));
+      expect(ticketRows).toHaveLength(1);
       const [stored] = await tx
         .select({
           outcome: messages.outcome,

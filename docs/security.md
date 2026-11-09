@@ -49,9 +49,9 @@ Permission names live in `src/server/auth/permissions.ts`. They match spec secti
 
 A missing membership, a deactivated membership, or a missing permission is the same forbidden result. The response does not say which one failed.
 
-A role is not a superset of the others. A tenant admin can manage users, settings, and audit reads, and can read documents and tickets. An admin does not receive `order:read`. A knowledge manager does not receive order or ticket permissions. A support agent's ticket permissions do not include tenant-wide `conversation:read`. Conversation context for a ticket will be authorized with the ticket, in the ticket step. A person who needs two jobs gets two role rows. The union is `permissionsForRoles`.
+A role is not a superset of the others. A tenant admin can manage users, settings, and audit reads, and can read documents and tickets. An admin does not receive `order:read`. A knowledge manager does not receive order or ticket permissions. A support agent's ticket permissions do not include tenant-wide `conversation:read`. Conversation text for a ticket is loaded with that ticket, and only for a caller who can read the tenant queue. A person who needs two jobs gets two role rows. The union is `permissionsForRoles`.
 
-There is no `ticket:create` name in the spec list. Customer ticket creation will need an explicit decision when tickets exist. This step does not invent that permission.
+There is no `ticket:create` name in the spec list. This step does not add one. A customer opens a ticket with `conversation:create`, which they already hold, and only on a private conversation they own. `POST /api/v1/tickets` accepts `customer_requested_human` only. The workflow writes the other reasons it actually decides. Priority is computed from the reason. The request body cannot set it, and there is no staff override.
 
 ## Threats this step closes
 
@@ -129,11 +129,23 @@ A signed-in caller passes `tenantId` as a query parameter. That value only selec
 
 A logged-out caller cannot pass `tenantId` or `conversationId`. The tenant is the row whose slug is `SUPPORTPILOT_PUBLIC_TENANT_SLUG`. Local seed data uses `harbor` (Harbor Goods). If the variable is unset or the slug does not match a tenant, the route returns `public_tenant_unavailable`. The handler stores that conversation with `is_private = false` and a null customer. An order question on that logged-out path asks the person to sign in and does not query orders. `GET /api/v1/conversations` without a session is 401. A non-private conversation can be read by its id without a session. The id is the secret. Private rows stay hidden from that read.
 
-The message table is the product record. An assistant row stores the workflow outcome (`answered`, `clarified`, `abstained`, or `escalated`), the citation check (`passed`, `failed`, or `not_applicable`), the model id, a short reason code, the intent, and an escalation reason when the outcome is `escalated`. Citations stored on an answered message are the validated excerpts copied from retrieved chunks. The raw provider payload and token usage are not columns. An escalation row is the decision a later ticket step reads. This step does not insert a ticket, and the customer text does not say an agent has accepted. `audit_events` still has no payload. A signed-in answer also writes `conversation.answer` with the actor and the conversation id. A logged-out answer has no actor, so it does not write an audit event. The message row is the record.
+The message table is the product record. An assistant row stores the workflow outcome (`answered`, `clarified`, `abstained`, or `escalated`), the citation check (`passed`, `failed`, or `not_applicable`), the model id, a short reason code, the intent, and an escalation reason when the outcome is `escalated`. Citations stored on an answered message are the validated excerpts copied from retrieved chunks. The raw provider payload and token usage are not columns. A signed-in escalation also opens a ticket. The assistant sentence is fixed at that moment and still says a person has not accepted. Claim does not rewrite it. `audit_events` still has no payload. A signed-in answer also writes `conversation.answer` with the actor and the conversation id. A logged-out answer has no actor, so it does not write an audit event, and it does not open a ticket. The message row is the record.
 
 The rate limit is `support_rate_buckets`. The key is `user:<tenant>:<user>` or `public:<tenant>:<sha256 of the client address>`. The window is one database minute. `SUPPORTPILOT_RATE_LIMIT_PER_MINUTE` defaults to 60. A replay of a completed idempotency key does not take another slot. The counter is not a process-local map.
 
-A repeated idempotency key for the same customer, or for the logged-out demo in that public tenant, returns the original two messages. The key is not checked against a new question. A public idempotency key is a bearer token for that public answer. Clients should use a fresh UUID per submit.
+A repeated idempotency key for the same customer, or for the logged-out demo in that public tenant, returns the original two messages and, when that turn opened a ticket, the same ticket id with the ticket's current status. The key is not checked against a new question. A public idempotency key is a bearer token for that public answer. Clients should use a fresh UUID per submit.
+
+## Tickets
+
+`POST /api/v1/tickets` takes `tenantId` as a query parameter and `conversationId` plus `reason` in the body. The reason has to be `customer_requested_human`. A `priority` field is rejected. The handler loads `conversation:create` for that tenant, then inserts only when the conversation is private and `customer_user_id` is the actor. Another customer's conversation is a 404. A second open ticket for the same conversation and reason returns the existing row. `open`, `assigned`, `in_progress`, and `reopened` all count as open for that unique index. `resolved` does not. `closed` is in the enum and has no transition.
+
+Claim, reply, resolve, and reopen require `ticket:claim`, `ticket:reply`, and `ticket:resolve` in that tenant. Resolve and a customer-visible reply require the caller to be the current assignee. Another agent receives `illegal_transition` or `ticket_held`. Reopen requires `ticket:resolve` and does not require the old assignee, because a resolved ticket is not held. Reopen clears the assignee. The next claim sets a new one and clears `resolved_at`.
+
+Customer and queue reads select `ticket_messages.visibility = 'customer'` only. An agent with `ticket:reply` also selects `internal` rows, and those are returned as `notes`. The customer JSON schema has no `notes` field. `loadTicketModelContext` uses the same customer-only filter. It builds text from the reason, the status, the conversation, and customer-visible replies. Note text is not a parameter of that function.
+
+A signed-in workflow escalation calls the same insert. The customer sentence remains "A support agent has not accepted this yet." Claim does not change that sentence. Ticket status is the live signal that a person holds it.
+
+Ticket audit actions are `ticket.create`, `ticket.claim`, `ticket.reply`, `ticket.note`, `ticket.resolve`, and `ticket.reopen`. They do not store the reply body.
 
 ## Retention
 
@@ -145,7 +157,8 @@ What this schema stores, and how long it is meant to live:
 - Audit events are kept for the life of the tenant record. They are not a place to store message text, document text, or secrets.
 - Document rows and chunks stay when a version is superseded or retired. Retirement and supersession clear `is_current`. They do not delete the text or the audit row. A failed reindex deletes that version's chunk rows so a failed document has no vectors. The source text remains, and a later reindex can rebuild the chunks.
 - Do not log document bodies or embedding errors. Provider exceptions can echo the input.
-- Conversations and messages stay with the tenant. Deactivating a membership does not delete them. This step does not expire or purge them. Do not log message bodies by default. Rate-limit buckets older than two minutes are deleted by the limiter. Tickets are still not stored.
+- Conversations and messages stay with the tenant. Deactivating a membership does not delete them. This step does not expire or purge them. Do not log message bodies by default. Rate-limit buckets older than two minutes are deleted by the limiter.
+- Tickets and ticket messages stay with the tenant. Resolving a ticket does not delete it. Deactivating a membership does not delete it. Do not log reply bodies or staff notes by default. Audit rows for ticket actions store the actor and the ticket id, not the note.
 - Customer and order rows stay with the tenant. Order lookup does not delete them. Do not log internal notes, payment instrument values, or the lookup response by default.
 
 Development seed data uses fixed example identities and no passwords. `npm run db:seed` refuses `NODE_ENV=production`, any Vercel runtime, and Vercel preview or production. The seed is not a migration and must not be pointed at a production database.
