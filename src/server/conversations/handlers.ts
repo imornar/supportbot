@@ -11,7 +11,10 @@ import {
   createEmbeddingProvider,
   type EmbeddingProvider,
 } from "@/server/documents/embed";
-import { createChatProvider } from "@/server/answers/provider";
+import {
+  createChatProvider,
+  parseChatTimeoutMs,
+} from "@/server/answers/provider";
 import type { ChatProvider } from "@/server/answers/provider";
 import {
   getRetrievalSettings,
@@ -141,6 +144,7 @@ export function createConversationHandlers(
             tenantId: scope.tenantId,
             question: body.question,
             asOf: isoDate(deps.now()),
+            timeoutMs: parseChatTimeoutMs(deps.env),
           });
           const stored = await completeSubmission(db, {
             submissionId: claim.id,

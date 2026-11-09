@@ -54,10 +54,23 @@ When two current published articles both clear the threshold, retrieval returns 
 
 These tests do not measure whether a live model would set `conflict` on the contradiction article. They measure the server rule after that flag is set. Changing `minimumCitationCount` or resolving conflicts when a date is missing changes how often the function abstains.
 
+## Support workflow
+
+Workflow tests call `runSupportWorkflow` with a scripted chat provider. They do not call OpenAI and they do not start HTTP.
+
+- "Talk to a human" is `escalated` / `customer_requested_human`. Retrieval and the model are not called.
+- "Where is order 1042?" is `escalated` / `business_tool_unavailable`. No order function runs.
+- "help" is `clarified`. The model is not called.
+- An ordinary question with empty evidence is `abstained` / `no_evidence`, the same sentence as the grounded-answer empty case.
+- A scripted grounded citation is `answered`. A scripted abstention stays `abstained`.
+- A `tool` field on the model JSON is `invalid_output`.
+- A chat or retrieve call that never resolves becomes `provider_error` or `retrieval_failed` inside the node timeout.
+- A recursion limit of 1 becomes `workflow_failure`. The runner will not accept a limit above 8.
+
 ## Limits
 
 - These vectors do not measure recall on real support wording. Two sentences about shipping are orthogonal unless the fixture says they share an axis.
 - The retrieval dataset does not grade answer wording. Citation and abstention checks are the scripted tests above.
 - Tenant isolation is the second integration test, not a row inside the single-tenant file.
 - Prompt injection in a chunk is stored and returned as text. The answer step puts that text in the user message and still requires a real citation. It does not prove a live model will ignore the instruction.
-- Order lookup and human handoff are later datasets. A provider failure is an abstention in the scripted test, not a live outage.
+- Order lookup is still not a tool. The workflow test only checks that an order question escalates. A provider failure is an abstention in the scripted test, not a live outage.

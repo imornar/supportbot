@@ -22,6 +22,7 @@ import {
 import type { TenantQueryClient } from "@/server/db/tenant-queries";
 import { seedUsers } from "@/server/db/seed-data";
 import { fakeEmbedder } from "@/server/documents/embed";
+import { humanEscalationMessage } from "@/server/workflow/decision";
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const rollback = new Error("rollback conversation test");
@@ -137,6 +138,8 @@ describe.skipIf(!databaseUrl)("conversations API", () => {
           citationValidation: messages.citationValidation,
           modelId: messages.modelId,
           answerReason: messages.answerReason,
+          workflowIntent: messages.workflowIntent,
+          escalationReason: messages.escalationReason,
         })
         .from(messages)
         .where(
@@ -153,10 +156,14 @@ describe.skipIf(!databaseUrl)("conversations API", () => {
         citationValidation: "passed",
         modelId: "fixture-model",
         answerReason: "grounded",
+        workflowIntent: "ordinary",
+        escalationReason: null,
       });
       expect(stored.find((row) => row.outcome === "abstained")).toMatchObject({
         citationValidation: "not_applicable",
         answerReason: "model_abstained",
+        workflowIntent: "ordinary",
+        escalationReason: null,
       });
 
       const events = await tx
@@ -195,6 +202,79 @@ describe.skipIf(!databaseUrl)("conversations API", () => {
             row.citationValidation === "failed",
         ),
       ).toBe(true);
+    });
+  });
+
+  it("stores a human request as an escalation and does not draft an answer", async () => {
+    await withRollback(async (tx) => {
+      const fixture = await seedFixture(tx);
+      let modelCalls = 0;
+      const handlers = createConversationHandlers({
+        db: () => tx,
+        embedder: () => {
+          const embedder = fakeEmbedder();
+          return {
+            ...embedder,
+            async embed(inputs) {
+              modelCalls += 1;
+              return embedder.embed(inputs);
+            },
+          };
+        },
+        chat: () => ({
+          model: "fixture-model",
+          complete: async () => {
+            modelCalls += 1;
+            throw new Error("model should not be called");
+          },
+        }),
+        retrievalSettings: () => ({ topK: 5, similarityThreshold: 0.3 }),
+        now: () => new Date("2026-11-09T12:00:00.000Z"),
+        env: {
+          NODE_ENV: "test",
+          SUPPORTPILOT_ALLOW_DEV_IDENTITY: "true",
+          SUPPORTPILOT_PUBLIC_TENANT_SLUG: fixture.slug,
+          SUPPORTPILOT_RATE_LIMIT_PER_MINUTE: "10",
+        },
+        accessDeps: accessFor(tx, {
+          NODE_ENV: "test",
+          SUPPORTPILOT_ALLOW_DEV_IDENTITY: "true",
+        }),
+      });
+      const response = await handlers.post(
+        post(fixture.tenantA, fixture.customerA, randomUUID(), {
+          question: "I want to talk to a human",
+        }),
+      );
+      expect(response.status).toBe(201);
+      const body = (await response.json()) as {
+        messages: Array<{ role: string; outcome: string | null; body: string }>;
+      };
+      expect(body.messages[1]?.outcome).toBe("escalated");
+      expect(body.messages[1]?.body).toBe(humanEscalationMessage);
+      expect(modelCalls).toBe(0);
+      const [stored] = await tx
+        .select({
+          outcome: messages.outcome,
+          answerReason: messages.answerReason,
+          workflowIntent: messages.workflowIntent,
+          escalationReason: messages.escalationReason,
+          citations: messages.citations,
+        })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.tenantId, fixture.tenantA),
+            eq(messages.role, "assistant"),
+          ),
+        );
+      expect(stored).toMatchObject({
+        outcome: "escalated",
+        answerReason: "customer_requested_human",
+        workflowIntent: "human_request",
+        escalationReason: "customer_requested_human",
+        citations: [],
+      });
     });
   });
 

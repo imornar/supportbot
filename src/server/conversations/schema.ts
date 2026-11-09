@@ -29,6 +29,10 @@ export const answerReasons = [
   "unresolved_conflict",
   "provider_error",
   "retrieval_failed",
+  "clarification_needed",
+  "customer_requested_human",
+  "business_tool_unavailable",
+  "workflow_failure",
 ] as const;
 
 export type AnswerReason = (typeof answerReasons)[number];
@@ -63,7 +67,9 @@ export const messageResponseSchema = z
     id: z.uuid(),
     role: z.enum(["user", "assistant"]),
     body: z.string(),
-    outcome: z.enum(["answered", "abstained"]).nullable(),
+    outcome: z
+      .enum(["answered", "clarified", "abstained", "escalated"])
+      .nullable(),
     citations: z.array(storedCitationSchema),
     createdAt: z.string(),
   })

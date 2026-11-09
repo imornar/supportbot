@@ -1,38 +1,20 @@
 import "server-only";
 
-import type { GroundedAnswer } from "@/server/answers/generate";
-import { generateGroundedAnswer } from "@/server/answers/generate";
 import type { ChatProvider } from "@/server/answers/provider";
-import type { EmbeddingProvider } from "@/server/documents/embed";
 import { embeddingDimensions } from "@/server/db/schema";
+import type { EmbeddingProvider } from "@/server/documents/embed";
 import type { TenantQueryClient } from "@/server/db/tenant-queries";
 import { retrieveEvidence } from "@/server/retrieval/retrieve";
 import type { RetrievalSettings } from "@/server/retrieval/settings";
+import { fromGrounded, type PersistedAnswer } from "@/server/workflow/decision";
+import { runSupportWorkflow } from "@/server/workflow/run";
 
-import {
-  citationValidationFor,
-  storedCitationSchema,
-  storedModelId,
-  type AnswerReason,
-  type CitationValidation,
-  type StoredCitation,
-} from "@/server/conversations/schema";
-
-const unavailableMessage = "I can't answer right now. Please try again later.";
-
-export type PersistedAnswer = {
-  outcome: "answered" | "abstained";
-  body: string;
-  citations: StoredCitation[];
-  citationValidation: CitationValidation;
-  modelId: string | null;
-  answerReason: AnswerReason;
-};
+export { fromGrounded, type PersistedAnswer };
 
 /**
- * Retrieval uses the tenant id the handler already resolved. The model sees
- * the question and that evidence only. Embedding and retrieval failures become
- * an abstention with a fixed sentence. The provider error text is not stored.
+ * The handler has already authorized the tenant. This function closes over
+ * that tenant id and the database client. The graph receives the closure. It
+ * does not receive a connection string or a tool list.
  */
 export async function answerSupportQuestion(input: {
   db: TenantQueryClient;
@@ -42,74 +24,39 @@ export async function answerSupportQuestion(input: {
   tenantId: string;
   question: string;
   asOf: string;
+  timeoutMs: number;
 }): Promise<PersistedAnswer> {
-  let embedding: number[] | undefined;
-  try {
-    const vectors = await input.embedder.embed([input.question]);
-    embedding = vectors[0];
-  } catch {
-    return failedRetrieval();
-  }
-  if (!embedding || embedding.length !== embeddingDimensions) {
-    return failedRetrieval();
-  }
-
-  try {
-    const evidence = await retrieveEvidence(input.db, {
+  return runSupportWorkflow({
+    question: input.question,
+    context: {
       tenantId: input.tenantId,
-      embedding,
-      settings: input.settings,
       asOf: input.asOf,
-    });
-    const grounded = await generateGroundedAnswer(
-      { question: input.question, evidence },
-      input.chat,
-    );
-    return fromGrounded(grounded);
-  } catch {
-    return failedRetrieval();
-  }
+      timeoutMs: input.timeoutMs,
+      chat: input.chat,
+      retrieve: (question) => retrieveAuthorizedEvidence(input, question),
+    },
+  });
 }
 
-export function fromGrounded(answer: GroundedAnswer): PersistedAnswer {
-  const reason = answer.reason;
-  const validation = citationValidationFor(reason);
-  const citations =
-    validation === "passed" ? acceptCitations(answer.citations) : [];
-  if (validation === "passed" && citations === null) {
-    return failedRetrieval();
+async function retrieveAuthorizedEvidence(
+  input: {
+    db: TenantQueryClient;
+    embedder: EmbeddingProvider;
+    settings: RetrievalSettings;
+    tenantId: string;
+    asOf: string;
+  },
+  question: string,
+) {
+  const vectors = await input.embedder.embed([question]);
+  const embedding = vectors[0];
+  if (!embedding || embedding.length !== embeddingDimensions) {
+    throw new Error("Query embedding was rejected. Values are omitted.");
   }
-  const body = answer.answer.trim();
-  if (body.length === 0 || body.length > 4_000) {
-    return failedRetrieval();
-  }
-  return {
-    outcome: reason === "grounded" ? "answered" : "abstained",
-    body,
-    citations: citations ?? [],
-    citationValidation: validation,
-    modelId: storedModelId(answer.model),
-    answerReason: reason,
-  };
-}
-
-function acceptCitations(
-  citations: GroundedAnswer["citations"],
-): StoredCitation[] | null {
-  const parsed = storedCitationSchema.array().safeParse(citations);
-  if (!parsed.success) {
-    return null;
-  }
-  return parsed.data;
-}
-
-function failedRetrieval(): PersistedAnswer {
-  return {
-    outcome: "abstained",
-    body: unavailableMessage,
-    citations: [],
-    citationValidation: "not_applicable",
-    modelId: null,
-    answerReason: "retrieval_failed",
-  };
+  return retrieveEvidence(input.db, {
+    tenantId: input.tenantId,
+    embedding,
+    settings: input.settings,
+    asOf: input.asOf,
+  });
 }

@@ -119,6 +119,8 @@ describe.skipIf(!databaseUrl)("postgres", () => {
         "messages.citation_validation",
         "messages.model_id",
         "messages.answer_reason",
+        "messages.workflow_intent",
+        "messages.escalation_reason",
       ]),
     );
     expect(names).toEqual(
