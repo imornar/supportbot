@@ -21,7 +21,12 @@ import { ConversationRequestError } from "@/server/conversations/store";
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export type SupportActor =
-  | { kind: "customer"; userId: string; tenantId: string }
+  | {
+      kind: "customer";
+      userId: string;
+      tenantId: string;
+      permissions: readonly Permission[];
+    }
   | { kind: "anonymous" };
 
 /**
@@ -60,6 +65,7 @@ export async function resolveSupportActor(
       kind: "customer",
       userId: access.userId,
       tenantId: access.tenantId,
+      permissions: access.permissions,
     };
   }
 

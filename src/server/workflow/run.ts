@@ -12,8 +12,9 @@ import {
 } from "@/server/workflow/graph";
 
 /**
- * One classify, at most one retrieval, at most one judgment, then a terminal
- * node. Eight super-steps is above that path and still rejects a cycle.
+ * One classify, then either a lookup, a clarification, an escalation, or
+ * retrieval plus judgment. Eight super-steps is above that path and still
+ * rejects a cycle.
  */
 export const workflowRecursionLimit = 8;
 

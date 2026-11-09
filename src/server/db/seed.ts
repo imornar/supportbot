@@ -5,13 +5,17 @@ import { parseAuditEvent } from "@/server/db/audit";
 import * as schema from "@/server/db/schema";
 import {
   auditEvents,
+  customers,
+  orders,
   roleAssignments,
   tenantMemberships,
   tenants,
   users,
 } from "@/server/db/schema";
 import {
+  seedCustomers,
   seedMemberships,
+  seedOrders,
   seedRoleAssignments,
   seedTenants,
   seedUsers,
@@ -46,6 +50,14 @@ export async function insertDevelopmentSeed(
   await db
     .insert(roleAssignments)
     .values([...seedRoleAssignments])
+    .onConflictDoNothing();
+  await db
+    .insert(customers)
+    .values([...seedCustomers])
+    .onConflictDoNothing();
+  await db
+    .insert(orders)
+    .values([...seedOrders])
     .onConflictDoNothing();
 
   for (const tenant of seedTenants) {

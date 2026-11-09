@@ -173,3 +173,83 @@ export const seedRoleAssignments = [
   membershipId: string;
   role: Role;
 }>;
+
+const casey = seedUsers[3].id;
+const pat = seedUsers[5].id;
+const jordan = seedUsers[6].id;
+
+export const seedCustomers = [
+  {
+    id: "60000000-0000-4000-8000-000000000001",
+    tenantId: harbor,
+    userId: casey,
+  },
+  {
+    id: "60000000-0000-4000-8000-000000000002",
+    tenantId: harbor,
+    userId: jordan,
+  },
+  {
+    id: "60000000-0000-4000-8000-000000000003",
+    tenantId: northwind,
+    userId: pat,
+  },
+] as const;
+
+export const seedOrders = [
+  {
+    id: "70000000-0000-4000-8000-000000000001",
+    tenantId: harbor,
+    customerId: seedCustomers[0].id,
+    orderNumber: "1042",
+    status: "shipped",
+    placedOn: "2026-11-01",
+    summary: "Canvas tote is on the way.",
+    internalNotes: "staff-only-harbor-1042",
+    paymentInstrument: "instrument-harbor-1042",
+  },
+  {
+    id: "70000000-0000-4000-8000-000000000002",
+    tenantId: harbor,
+    customerId: seedCustomers[0].id,
+    orderNumber: "1043",
+    status: "delivered",
+    placedOn: "2026-10-02",
+    summary: "Wool blanket was delivered.",
+    internalNotes: "staff-only-harbor-1043",
+    paymentInstrument: "instrument-harbor-1043",
+  },
+  {
+    id: "70000000-0000-4000-8000-000000000003",
+    tenantId: harbor,
+    customerId: seedCustomers[1].id,
+    orderNumber: "2001",
+    status: "placed",
+    placedOn: "2026-11-08",
+    summary: "Notebook is placed.",
+    internalNotes: "staff-only-harbor-2001",
+    paymentInstrument: "instrument-harbor-2001",
+  },
+  {
+    id: "70000000-0000-4000-8000-000000000004",
+    tenantId: northwind,
+    customerId: seedCustomers[2].id,
+    orderNumber: "1042",
+    status: "shipped",
+    placedOn: "2026-11-03",
+    summary: "Parka is on the way.",
+    internalNotes: "staff-only-northwind-1042",
+    paymentInstrument: "instrument-northwind-1042",
+  },
+  {
+    id: "70000000-0000-4000-8000-000000000005",
+    tenantId: northwind,
+    customerId: seedCustomers[2].id,
+    orderNumber: "8800",
+    status: "delivered",
+    placedOn: "2026-09-12",
+    summary: "Rain shell was delivered.",
+    internalNotes: "staff-only-northwind-8800",
+    paymentInstrument: "instrument-northwind-8800",
+  },
+] as const;

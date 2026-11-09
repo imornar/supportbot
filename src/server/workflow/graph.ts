@@ -11,12 +11,20 @@ import type { ChatProvider } from "@/server/answers/provider";
 import type { RetrievedEvidence } from "@/server/retrieval/retrieve";
 
 import {
+  buildOrderExtractionMessages,
+  parseModelJson,
+} from "@/server/orders/request";
+import type { OrderAccess } from "@/server/orders/types";
+import {
   clarificationDecision,
   escalationDecision,
   fromGrounded,
   humanEscalationMessage,
-  orderEscalationMessage,
+  orderFoundDecision,
+  orderRefusalDecision,
+  orderUnavailableDecision,
   retrievalFailureDecision,
+  signInForOrderDecision,
   workflowFailureDecision,
   type PersistedAnswer,
 } from "@/server/workflow/decision";
@@ -27,8 +35,8 @@ import {
 import { withTimeout } from "@/server/workflow/timeout";
 
 /**
- * Closed list. There is no tool node and no path that reads a model-chosen
- * tool name. `possible_order` escalates until Step 10 replaces that arm.
+ * Closed list. `lookup_order` is the one business read. The model does not
+ * choose a tool name, and a caller-supplied tool map is not read.
  */
 export const supportWorkflowNodeNames = [
   "classify",
@@ -38,6 +46,7 @@ export const supportWorkflowNodeNames = [
   "clarify",
   "abstain",
   "escalate",
+  "lookup_order",
 ] as const;
 
 export type SupportWorkflowNodeName = (typeof supportWorkflowNodeNames)[number];
@@ -50,6 +59,7 @@ export type SupportWorkflowContext = {
   timeoutMs: number;
   chat: ChatProvider;
   retrieve: (question: string) => Promise<RetrievedEvidence[]>;
+  orderAccess: OrderAccess;
 };
 
 type RetrievalStatus = "ok" | "empty" | "failed";
@@ -87,9 +97,12 @@ type NodeConfig = {
 
 export function routeAfterClassify(
   state: Pick<WorkflowState, "intent">,
-): "escalate" | "clarify" | "retrieve" {
-  if (state.intent === "human_request" || state.intent === "possible_order") {
+): "escalate" | "clarify" | "retrieve" | "lookup_order" {
+  if (state.intent === "human_request") {
     return "escalate";
+  }
+  if (state.intent === "possible_order") {
+    return "lookup_order";
   }
   if (state.intent === "needs_clarification") {
     return "clarify";
@@ -132,7 +145,22 @@ function isWorkflowContext(value: unknown): value is SupportWorkflowContext {
     typeof candidate.asOf === "string" &&
     typeof candidate.timeoutMs === "number" &&
     typeof candidate.retrieve === "function" &&
-    typeof candidate.chat?.complete === "function"
+    typeof candidate.chat?.complete === "function" &&
+    isOrderAccess(candidate.orderAccess)
+  );
+}
+
+function isOrderAccess(value: unknown): value is OrderAccess {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const mode = (value as { mode?: unknown }).mode;
+  if (mode === "anonymous" || mode === "unregistered") {
+    return true;
+  }
+  return (
+    mode === "customer" &&
+    typeof (value as { lookup?: unknown }).lookup === "function"
   );
 }
 
@@ -219,16 +247,43 @@ function escalateNode(state: WorkflowState) {
       ),
     };
   }
-  if (state.intent === "possible_order") {
-    return {
-      decision: escalationDecision(
-        "possible_order",
-        "business_tool_unavailable",
-        orderEscalationMessage,
-      ),
-    };
-  }
   return { decision: workflowFailureDecision() };
+}
+
+async function lookupOrderNode(state: WorkflowState, config: NodeConfig) {
+  const context = readContext(config);
+  if (context.orderAccess.mode === "anonymous") {
+    return { decision: signInForOrderDecision() };
+  }
+  if (context.orderAccess.mode !== "customer") {
+    return { decision: orderUnavailableDecision() };
+  }
+  let modelOutput: unknown = null;
+  try {
+    const completion = await withTimeout(
+      context.chat.complete({
+        messages: buildOrderExtractionMessages(state.question),
+      }),
+      context.timeoutMs,
+      config.signal,
+    );
+    modelOutput = parseModelJson(completion.content);
+  } catch {
+    modelOutput = null;
+  }
+  try {
+    const result = await withTimeout(
+      context.orderAccess.lookup(modelOutput, state.question),
+      context.timeoutMs,
+      config.signal,
+    );
+    if (result.status === "found") {
+      return { decision: orderFoundDecision(result.order) };
+    }
+    return { decision: orderRefusalDecision() };
+  } catch {
+    return { decision: workflowFailureDecision("possible_order") };
+  }
 }
 
 export function supportWorkflowNodeTimeoutMs(timeoutMs: number): number {
@@ -245,6 +300,7 @@ export function createSupportWorkflow(timeoutMs: number) {
     .addNode("clarify", clarifyNode)
     .addNode("abstain", abstainNode)
     .addNode("escalate", escalateNode)
+    .addNode("lookup_order", lookupOrderNode, { timeout: nodeTimeout })
     .addEdge(START, "classify")
     .addConditionalEdges("classify", routeAfterClassify)
     .addConditionalEdges("retrieve", routeAfterRetrieve)
@@ -252,7 +308,8 @@ export function createSupportWorkflow(timeoutMs: number) {
     .addEdge("answer", END)
     .addEdge("clarify", END)
     .addEdge("abstain", END)
-    .addEdge("escalate", END);
+    .addEdge("escalate", END)
+    .addEdge("lookup_order", END);
 
   const nodeNames = Object.keys(builder.nodes);
   const allowed = new Set<string>(supportWorkflowNodeNames);

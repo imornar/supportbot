@@ -33,6 +33,10 @@ export const answerReasons = [
   "customer_requested_human",
   "business_tool_unavailable",
   "workflow_failure",
+  "order_lookup",
+  "order_not_found",
+  "order_unavailable",
+  "sign_in_required",
 ] as const;
 
 export type AnswerReason = (typeof answerReasons)[number];

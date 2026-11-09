@@ -145,6 +145,14 @@ export function createConversationHandlers(
             question: body.question,
             asOf: isoDate(deps.now()),
             timeoutMs: parseChatTimeoutMs(deps.env),
+            actor:
+              actor.kind === "customer"
+                ? {
+                    kind: "customer",
+                    userId: actor.userId,
+                    permissions: actor.permissions,
+                  }
+                : { kind: "anonymous" },
           });
           const stored = await completeSubmission(db, {
             submissionId: claim.id,

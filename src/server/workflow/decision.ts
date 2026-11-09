@@ -13,6 +13,7 @@ import {
   type StoredCitation,
 } from "@/server/conversations/schema";
 
+import type { OrderSummary } from "@/server/orders/types";
 import type { WorkflowIntent } from "@/server/workflow/intent";
 
 export const escalationReasons = [
@@ -35,8 +36,13 @@ export type WorkflowOutcome = (typeof workflowOutcomes)[number];
 export const humanEscalationMessage =
   "You asked for a person. A support agent has not accepted this yet.";
 
-export const orderEscalationMessage =
-  "I can't look up an order yet. A support agent has not accepted this yet.";
+export const signInForOrderMessage = "Sign in to look up an order.";
+
+export const orderUnavailableMessage =
+  "I can't look up orders for this account.";
+
+export const orderRefusalMessage =
+  "I can only look up one order that belongs to you.";
 
 export const workflowFailureMessage =
   "I can't complete that request. A support agent has not accepted this yet.";
@@ -125,12 +131,66 @@ export function retrievalFailureDecision(): PersistedAnswer {
   };
 }
 
-export function workflowFailureDecision(): PersistedAnswer {
-  return escalationDecision(
-    "ordinary",
-    "workflow_failure",
-    workflowFailureMessage,
-  );
+export function signInForOrderDecision(): PersistedAnswer {
+  return {
+    outcome: "clarified",
+    body: signInForOrderMessage,
+    citations: [],
+    citationValidation: "not_applicable",
+    modelId: null,
+    answerReason: "sign_in_required",
+    intent: "possible_order",
+    escalationReason: null,
+  };
+}
+
+export function orderUnavailableDecision(): PersistedAnswer {
+  return {
+    outcome: "abstained",
+    body: orderUnavailableMessage,
+    citations: [],
+    citationValidation: "not_applicable",
+    modelId: null,
+    answerReason: "order_unavailable",
+    intent: "possible_order",
+    escalationReason: null,
+  };
+}
+
+export function orderRefusalDecision(): PersistedAnswer {
+  return {
+    outcome: "abstained",
+    body: orderRefusalMessage,
+    citations: [],
+    citationValidation: "not_applicable",
+    modelId: null,
+    answerReason: "order_not_found",
+    intent: "possible_order",
+    escalationReason: null,
+  };
+}
+
+export function orderFoundDecision(order: OrderSummary): PersistedAnswer {
+  const body = `Order ${order.orderNumber} is ${order.status}. Placed ${order.placedOn}. ${order.summary}`;
+  if (body.length > 4_000) {
+    return orderRefusalDecision();
+  }
+  return {
+    outcome: "answered",
+    body,
+    citations: [],
+    citationValidation: "not_applicable",
+    modelId: null,
+    answerReason: "order_lookup",
+    intent: "possible_order",
+    escalationReason: null,
+  };
+}
+
+export function workflowFailureDecision(
+  intent: WorkflowIntent = "ordinary",
+): PersistedAnswer {
+  return escalationDecision(intent, "workflow_failure", workflowFailureMessage);
 }
 
 function acceptCitations(

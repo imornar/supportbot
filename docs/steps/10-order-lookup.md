@@ -2,7 +2,7 @@
 
 - Phase: Knowledge and AI
 - Depends on: 04, 09
-- Status: not_started
+- Status: in_review
 - Spec: sections 9, 11
 
 ## Goal
