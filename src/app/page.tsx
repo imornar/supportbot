@@ -41,6 +41,12 @@ export default async function HomePage() {
           >
             Sign in
           </a>
+          <Link
+            className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700"
+            href="/staff"
+          >
+            Staff
+          </Link>
           {devIdentityEnabled(process.env) ? (
             <Link
               className="inline-flex h-10 items-center rounded-full border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700"

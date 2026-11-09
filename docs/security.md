@@ -137,7 +137,9 @@ A repeated idempotency key for the same customer, or for the logged-out demo in 
 
 ## Customer chat page
 
-The home page calls `POST /api/v1/support/messages` and `GET /api/v1/tickets/:id`. It does not call OpenAI, and it does not send a tenant id, user id, or tool name in the JSON body. A signed-in page offers tenant ids loaded on the server from that user's active customer memberships. The route still checks the membership. A logged-out page has no tenant id in the document. A response that fails, or a JSON object that does not match the customer schema, is shown as a failure. A ticket object with a `notes` field is rejected in the browser and is not rendered. The status sentence says a person has accepted the request only for `assigned` and `in_progress`.
+The home page calls `POST /api/v1/support/messages` and `GET /api/v1/tickets/:id`. It does not call OpenAI, and it does not send a tenant id, user id, or tool name in the JSON body. A signed-in page offers tenant ids loaded on the server from that user's active customer memberships. The route still checks the membership. A logged-out page has no tenant id in the document. A response that fails, or a JSON object that does not match the customer schema, is shown as a failure. A ticket object with a `notes` field is rejected in the browser and is not rendered. The customer page has no internal-notes section. The status sentence says a person has accepted the request only for `assigned` and `in_progress`.
+
+Staff screens under `/staff` call `GET /api/v1/staff/session`, then the document, ticket, member, settings, and audit routes. The session payload chooses which links appear. A customer membership does not get an upload control. A knowledge manager does not get member administration. The API still returns 403 when the permission is missing. Ingestion failures render one of four fixed sentences. The page does not show `failureReason` text it does not recognize, a checksum, a document body, or an error string from the response. Internal notes render in their own section on the ticket page. The customer ticket schema still has no `notes` field.
 
 ## Tickets
 
@@ -162,6 +164,8 @@ Document list, detail, reindex, and retire stay on `document:read`, `document:up
 The last active `tenant_admin` cannot be revoked or deactivated. That check runs in the same transaction that locks the tenant's membership rows. A role change is a row in `role_assignments`. The next request loads roles again. Deactivation sets `tenant_memberships.status` to `deactivated` and leaves the user row in place. `loadMembershipAccess` ignores that row, so the next permission check is forbidden. A support agent does not hold `tenant:user:manage` or `tenant:settings:manage`.
 
 `GET` and `PATCH /api/v1/tenants/:tenantId/settings` require `tenant:settings:manage`. The only setting is `tenants.public_support_name`. The support workflow reads it when it builds an escalation sentence. The sentence still ends with "has not accepted this yet." The name is a short label, not a free-form message. Audit action `tenant.settings` stores the actor and the tenant id. It does not store the name. Role changes write `membership.role_assign`, `membership.role_revoke`, and `membership.deactivate` against the membership id.
+
+`GET /api/v1/tenants/:tenantId/audit` requires `audit:read`. The SQL filter is `audit_events.tenant_id`. The JSON lists `id`, `action`, `targetType`, `targetId`, `actorUserId`, and `createdAt`. It does not add a metadata object. A caller without `audit:read` is 403 before the query.
 
 ## Retention
 
