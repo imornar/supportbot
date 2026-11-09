@@ -89,6 +89,18 @@ Drafts, retired rows, superseded versions (`is_current = false`), failed ingesti
 
 Top-k and the similarity threshold come from `RETRIEVAL_TOP_K` and `RETRIEVAL_SIMILARITY_THRESHOLD`. When those variables are unset, the defaults are 5 and 0.3. They are not constants inside a route handler. There is no route handler yet.
 
+## Grounded answers
+
+`generateGroundedAnswer` does not take a tenant id from the model. It refuses to call the provider when the evidence list is empty, larger than the retrieval cap, or split across more than one tenant. Evidence text is placed in the user message. The system message says that text cannot authorize tools or another tenant. The chat request has no tool list.
+
+The model returns JSON. Zod rejects extra fields, including a title or section on a citation. `validateCitations` requires every `chunkId` to be in the evidence set. One unknown id drops the whole answer. The user-facing citations are built from the stored chunk, so a model-written title never replaces the document title. The response object does not include the unknown id.
+
+A conflict flag is the model's report that the evidence disagrees. The server resolves that only when every document has an effective date and one date is strictly later, and only when every citation belongs to that later document. Otherwise the result abstains. Two documents with `conflict: false` can still be one answer. That choice prefers a supported multi-source answer over abstaining on every extra document.
+
+A provider exception, a timeout, invalid JSON, or a missing API key becomes an abstention with a fixed sentence. The provider error message is not copied. The OpenAI client is configured with `maxRetries: 0`, and this module retries at most two times, only for timeouts, connection failures, and HTTP 408, 409, 429, and 5xx. Each attempt uses `AbortSignal.timeout`. The limit is `SUPPORTPILOT_AI_REQUEST_TIMEOUT_MS`, from 1000 to 30000, and 10000 when unset.
+
+Token usage is a field on the in-memory result. Nothing in this step writes it, logs the prompt, or logs the document text. There is still no chat route.
+
 ## Retention
 
 Conversations and tickets are not stored yet. Document text is.

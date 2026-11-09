@@ -1,6 +1,6 @@
 # Evaluation
 
-This file starts with retrieval. Answer quality, citation checks, abstention, and escalation are later steps. The dataset is `fixtures/retrieval/dataset.json`. Tests load it. Nothing in it is customer data or a secret.
+Retrieval labels live in `fixtures/retrieval/dataset.json`. Tests load that file. Nothing in it is customer data or a secret. Grounded-answer tests use scripted model JSON. They do not call OpenAI and they do not grade wording.
 
 ## What the dataset checks
 
@@ -38,12 +38,26 @@ Revisit hybrid when a sample of real `text-embedding-3-small` vectors shows a la
 
 An effective date in the future excludes the row. A null effective date does not. There is no expiry column, so an old date does not by itself retire a document. Superseded versions stay in the table and drop out because `is_current` is false. Retirement clears `is_current` as well.
 
-When two current published articles both clear the threshold, retrieval returns both. It does not apply source precedence and it does not hide the disagreement. Choosing, abstaining, or escalating is the grounded-answer step. The evidence carries the document version and the effective date so that step can see them.
+When two current published articles both clear the threshold, retrieval returns both. It does not apply source precedence and it does not hide the disagreement. The evidence carries the document version and the effective date. Precedence and abstention are described under Grounded answers.
+
+## Grounded answers
+
+`generateGroundedAnswer` is checked with scripted completions, not with the retrieval dataset. The cases are:
+
+- A cited chunk id is copied from the evidence, including title, section, and excerpt.
+- An id that was not in the evidence drops the answer. The result does not contain that id.
+- An empty evidence list does not call the provider.
+- `conflict: true` abstains when effective dates are missing, equal, or the citations are not only the later document.
+- A strictly later effective date can support an answer when the citations are only that document.
+- `conflict: false` can cite two documents. That matches `multi-source`. Treating every extra document as a conflict would abstain there.
+- The model abstaining, answering with no citations, returning non-JSON, or throwing becomes a fixed sentence. Usage is kept when the provider returned some. A thrown message is not copied.
+
+These tests do not measure whether a live model would set `conflict` on the contradiction article. They measure the server rule after that flag is set. Changing `minimumCitationCount` or resolving conflicts when a date is missing changes how often the function abstains.
 
 ## Limits
 
 - These vectors do not measure recall on real support wording. Two sentences about shipping are orthogonal unless the fixture says they share an axis.
-- The dataset does not grade answers, citations, or abstention.
+- The retrieval dataset does not grade answer wording. Citation and abstention checks are the scripted tests above.
 - Tenant isolation is the second integration test, not a row inside the single-tenant file.
-- Prompt injection in a chunk is stored and returned as text. This step does not ask a chat model to obey or refuse it.
-- Order lookup, human handoff, and provider failures are later datasets.
+- Prompt injection in a chunk is stored and returned as text. The answer step puts that text in the user message and still requires a real citation. It does not prove a live model will ignore the instruction.
+- Order lookup and human handoff are later datasets. A provider failure is an abstention in the scripted test, not a live outage.
