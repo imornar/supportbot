@@ -428,15 +428,14 @@ export const documentChunks = pgTable(
  * that flag. A client cannot.
  *
  * Message text is the product record. Audit metadata on an assistant message
- * is the outcome, the citation check, the model id, and a short reason code.
- * There is no column for the raw provider payload.
+ * is the workflow outcome, the citation check, the model id, a short reason
+ * code, the intent, and an escalation reason when the outcome is escalated.
+ * There is no column for the raw provider payload. Escalation does not insert
+ * a ticket. Step 11 reads the reason from this row.
  */
 export const messageRole = pgEnum("message_role", ["user", "assistant"]);
 
-export const messageOutcome = pgEnum("message_outcome", [
-  "answered",
-  "abstained",
-]);
+const messageOutcomeSql = sql`'answered', 'clarified', 'abstained', 'escalated'`;
 
 export const citationValidation = pgEnum("citation_validation", [
   "passed",
@@ -449,7 +448,13 @@ export const submissionStatus = pgEnum("submission_status", [
   "complete",
 ]);
 
-const answerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed'`;
+const groundedAnswerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed'`;
+
+const answerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed', 'clarification_needed', 'customer_requested_human', 'business_tool_unavailable', 'workflow_failure'`;
+
+const workflowIntentSql = sql`'human_request', 'possible_order', 'ordinary', 'needs_clarification'`;
+
+const escalationReasonSql = sql`'customer_requested_human', 'business_tool_unavailable', 'workflow_failure'`;
 
 export const conversations = pgTable(
   "conversations",
@@ -504,10 +509,12 @@ export const messages = pgTable(
     conversationId: uuid("conversation_id").notNull(),
     role: messageRole("role").notNull(),
     body: text("body").notNull(),
-    outcome: messageOutcome("outcome"),
+    outcome: text("outcome"),
     citationValidation: citationValidation("citation_validation"),
     modelId: text("model_id"),
     answerReason: text("answer_reason"),
+    workflowIntent: text("workflow_intent"),
+    escalationReason: text("escalation_reason"),
     citations: jsonb("citations")
       .$type<StoredCitation[]>()
       .notNull()
@@ -538,8 +545,20 @@ export const messages = pgTable(
       sql`${table.modelId} is null or ${table.modelId} ~ '^[A-Za-z0-9._:-]{1,64}$'`,
     ),
     check(
+      "messages_outcome",
+      sql`${table.outcome} is null or ${table.outcome} in (${messageOutcomeSql})`,
+    ),
+    check(
       "messages_answer_reason",
       sql`${table.answerReason} is null or ${table.answerReason} in (${answerReasonSql})`,
+    ),
+    check(
+      "messages_workflow_intent",
+      sql`${table.workflowIntent} is null or ${table.workflowIntent} in (${workflowIntentSql})`,
+    ),
+    check(
+      "messages_escalation_reason",
+      sql`${table.escalationReason} is null or ${table.escalationReason} in (${escalationReasonSql})`,
     ),
     check(
       "messages_citations_array",
@@ -552,6 +571,8 @@ export const messages = pgTable(
         and ${table.citationValidation} is null
         and ${table.modelId} is null
         and ${table.answerReason} is null
+        and ${table.workflowIntent} is null
+        and ${table.escalationReason} is null
         and ${table.citations} = '[]'::jsonb
       )`,
     ),
@@ -561,6 +582,43 @@ export const messages = pgTable(
         ${table.outcome} is not null
         and ${table.citationValidation} is not null
         and ${table.answerReason} is not null
+        and ${table.workflowIntent} is not null
+        and (
+          (
+            ${table.outcome} = 'escalated'
+            and ${table.escalationReason} is not null
+            and ${table.answerReason} = ${table.escalationReason}
+          ) or (
+            ${table.outcome} <> 'escalated'
+            and ${table.escalationReason} is null
+          )
+        )
+        and (
+          (
+            ${table.workflowIntent} = 'human_request'
+            and ${table.outcome} = 'escalated'
+            and ${table.answerReason} = 'customer_requested_human'
+          ) or (
+            ${table.workflowIntent} = 'possible_order'
+            and ${table.outcome} = 'escalated'
+            and ${table.answerReason} = 'business_tool_unavailable'
+          ) or (
+            ${table.workflowIntent} = 'needs_clarification'
+            and ${table.outcome} = 'clarified'
+            and ${table.answerReason} = 'clarification_needed'
+          ) or (
+            ${table.workflowIntent} = 'ordinary'
+            and (
+              (
+                ${table.outcome} in ('answered', 'abstained')
+                and ${table.answerReason} in (${groundedAnswerReasonSql})
+              ) or (
+                ${table.outcome} = 'escalated'
+                and ${table.answerReason} = 'workflow_failure'
+              )
+            )
+          )
+        )
       )`,
     ),
   ],

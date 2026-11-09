@@ -101,6 +101,18 @@ A provider exception, a timeout, invalid JSON, or a missing API key becomes an a
 
 Token usage stays on the in-memory result. The conversation step does not write it, and it does not log the prompt or the document text.
 
+## Support workflow
+
+Authorization finishes before `runSupportWorkflow`. The graph context is the tenant id already on the grant, the server date, a timeout, the chat provider, and a retrieve function closed over that tenant's database client. The graph module does not import the database client or read `DATABASE_URL`.
+
+The nodes are a fixed list: `classify`, `retrieve`, `judge`, `answer`, `clarify`, `abstain`, and `escalate`. There is no tool node. A model JSON field named `tool` fails the answer schema and becomes an abstention. A possible order question escalates with `business_tool_unavailable` because order lookup is not registered.
+
+Classification is a lexical rule. "Talk to a human" cannot be reclassified by the model, because the model is not asked. The same is true for an order-number question and for a question that is only a greeting.
+
+`retrieve` and `judge` each wait at most `SUPPORTPILOT_AI_REQUEST_TIMEOUT_MS` (10000 when unset). The LangGraph node cap is that value plus one second, and the graph recursion limit is 8. A timeout on retrieval or judgment abstains with the same fixed sentences as a provider failure. A recursion error or an unexpected graph error escalates with `workflow_failure` and a fixed sentence. None of those paths copy the provider error or the question into the stored reason.
+
+The workflow does not register a tracing callback. A process-wide LangSmith tracer would still be able to see the question and the retrieved text, so this app does not set one.
+
 ## Conversations
 
 `POST /api/v1/support/messages` is the customer question route. The JSON body may contain `question` and, for a signed-in customer, `conversationId`. It may not contain a tenant id, a user id, an order id, a tool name, or a history array. Zod rejects those fields. The idempotency key is the `Idempotency-Key` header, and it has to be a UUID.
@@ -109,7 +121,7 @@ A signed-in caller passes `tenantId` as a query parameter. That value only selec
 
 A logged-out caller cannot pass `tenantId` or `conversationId`. The tenant is the row whose slug is `SUPPORTPILOT_PUBLIC_TENANT_SLUG`. Local seed data uses `harbor` (Harbor Goods). If the variable is unset or the slug does not match a tenant, the route returns `public_tenant_unavailable`. The handler stores that conversation with `is_private = false` and a null customer. There is no order lookup on this route. `GET /api/v1/conversations` without a session is 401. A non-private conversation can be read by its id without a session. The id is the secret. Private rows stay hidden from that read.
 
-The message table is the product record. An assistant row stores the outcome (`answered` or `abstained`), the citation check (`passed`, `failed`, or `not_applicable`), the model id, and a short reason code. Citations stored on an answered message are the validated excerpts copied from retrieved chunks. The raw provider payload and token usage are not columns. `audit_events` still has no payload. A signed-in answer also writes `conversation.answer` with the actor and the conversation id. A logged-out answer has no actor, so it does not write an audit event. The message row is the record.
+The message table is the product record. An assistant row stores the workflow outcome (`answered`, `clarified`, `abstained`, or `escalated`), the citation check (`passed`, `failed`, or `not_applicable`), the model id, a short reason code, the intent, and an escalation reason when the outcome is `escalated`. Citations stored on an answered message are the validated excerpts copied from retrieved chunks. The raw provider payload and token usage are not columns. An escalation row is the decision a later ticket step reads. This step does not insert a ticket, and the customer text does not say an agent has accepted. `audit_events` still has no payload. A signed-in answer also writes `conversation.answer` with the actor and the conversation id. A logged-out answer has no actor, so it does not write an audit event. The message row is the record.
 
 The rate limit is `support_rate_buckets`. The key is `user:<tenant>:<user>` or `public:<tenant>:<sha256 of the client address>`. The window is one database minute. `SUPPORTPILOT_RATE_LIMIT_PER_MINUTE` defaults to 60. A replay of a completed idempotency key does not take another slot. The counter is not a process-local map.
 

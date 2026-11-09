@@ -172,6 +172,8 @@ export async function completeSubmission(
         citationValidation: input.answer.citationValidation,
         modelId: input.answer.modelId,
         answerReason: input.answer.answerReason,
+        workflowIntent: input.answer.intent,
+        escalationReason: input.answer.escalationReason,
         citations: input.answer.citations,
       })
       .returning({
@@ -486,7 +488,7 @@ function messageJson(row: {
   id: string;
   role: "user" | "assistant";
   body: string;
-  outcome: "answered" | "abstained" | null;
+  outcome: string | null;
   citations: unknown;
   createdAt: Date;
 }) {

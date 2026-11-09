@@ -13,9 +13,10 @@ import {
 import { maxRetrievalTopK } from "@/server/retrieval/settings";
 import type { RetrievedEvidence } from "@/server/retrieval/retrieve";
 
-const insufficientEvidenceMessage =
+export const insufficientEvidenceMessage =
   "I don't have enough published information to answer that.";
-const unavailableMessage = "I can't answer right now. Please try again later.";
+export const unavailableMessage =
+  "I can't answer right now. Please try again later.";
 
 export type GroundedAnswerReason =
   | "grounded"
@@ -173,6 +174,17 @@ function readJson(content: string | null): unknown {
   } catch {
     return null;
   }
+}
+
+export function ungroundedAnswer(
+  reason: Exclude<GroundedAnswerReason, "grounded">,
+  extra?: {
+    model?: string | null;
+    usage?: TokenUsage | null;
+    conflict?: boolean;
+  },
+): GroundedAnswer {
+  return abstained(reason, extra);
 }
 
 function abstained(

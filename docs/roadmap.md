@@ -15,7 +15,7 @@ Status values: `not_started`, `in_progress`, `in_review`, `done`.
 | [06](./steps/06-retrieval.md)             | Tenant-scoped retrieval              | 05                                        | in_review   |
 | [07](./steps/07-grounded-answers.md)      | Grounded answers and citations       | 06                                        | in_review   |
 | [08](./steps/08-conversations-api.md)     | Conversations API                    | 04, 07                                    | in_review   |
-| [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | not_started |
+| [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | in_review   |
 | [10](./steps/10-order-lookup.md)          | Authorized order lookup              | 04, 09                                    | not_started |
 | [11](./steps/11-tickets.md)               | Tickets and escalation               | 08, 09                                    | not_started |
 | [12](./steps/12-staff-operations.md)      | Staff and admin operations           | 05, 11                                    | not_started |
