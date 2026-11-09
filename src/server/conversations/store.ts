@@ -19,6 +19,10 @@ import {
   storedCitationSchema,
   type PostMessageResponse,
 } from "@/server/conversations/schema";
+import {
+  openEscalationTicket,
+  ticketSummaryById,
+} from "@/server/tickets/store";
 
 const listLimit = 50;
 const messageLimit = 200;
@@ -51,6 +55,7 @@ type SubmissionRow = {
   conversationId: string | null;
   userMessageId: string | null;
   assistantMessageId: string | null;
+  ticketId: string | null;
 };
 
 export async function findSubmission(
@@ -64,6 +69,7 @@ export async function findSubmission(
       conversationId: supportSubmissions.conversationId,
       userMessageId: supportSubmissions.userMessageId,
       assistantMessageId: supportSubmissions.assistantMessageId,
+      ticketId: supportSubmissions.ticketId,
     })
     .from(supportSubmissions)
     .where(scopeFilter(scope))
@@ -203,6 +209,31 @@ export async function completeSubmission(
     if (updated.length === 0) {
       throw new ConversationRequestError("idempotency_in_progress");
     }
+    const ticket =
+      input.scope.customerUserId &&
+      input.answer.outcome === "escalated" &&
+      input.answer.escalationReason
+        ? await openEscalationTicket(tx, {
+            tenantId: input.scope.tenantId,
+            conversationId,
+            requesterUserId: input.scope.customerUserId,
+            reason: input.answer.escalationReason,
+            sourceMessageId: assistantMessage.id,
+            citations: input.answer.citations,
+            actorUserId: input.scope.customerUserId,
+          })
+        : null;
+    if (ticket) {
+      await tx
+        .update(supportSubmissions)
+        .set({ ticketId: ticket.id })
+        .where(
+          and(
+            eq(supportSubmissions.id, input.submissionId),
+            eq(supportSubmissions.tenantId, input.scope.tenantId),
+          ),
+        );
+    }
     if (input.scope.customerUserId) {
       await insertAuditEvent(tx, {
         tenantId: input.scope.tenantId,
@@ -216,6 +247,14 @@ export async function completeSubmission(
       conversationId,
       isPrivate: input.scope.customerUserId !== null,
       replayed: false,
+      ticket: ticket
+        ? {
+            id: ticket.id,
+            status: ticket.status,
+            reason: ticket.reason,
+            priority: ticket.priority,
+          }
+        : null,
       messages: [
         messageJson({
           id: userMessage.id,
@@ -410,10 +449,14 @@ export async function replay(
   if (!userMessage || !assistantMessage) {
     throw new ConversationRequestError("not_found");
   }
+  const ticket = existing.ticketId
+    ? await ticketSummaryById(db, scope.tenantId, existing.ticketId)
+    : null;
   return postMessageResponseSchema.parse({
     conversationId: conversation.id,
     isPrivate: conversation.isPrivate,
     replayed: true,
+    ticket,
     messages: [messageJson(userMessage), messageJson(assistantMessage)],
   });
 }
