@@ -81,12 +81,20 @@ export default async function DevelopmentIdentityPage() {
           Clear development identity
         </button>
       </form>
-      <Link
-        className="text-sm text-zinc-600 underline dark:text-zinc-400"
-        href="/"
-      >
-        Back
-      </Link>
+      <div className="flex gap-4">
+        <Link
+          className="text-sm text-zinc-600 underline dark:text-zinc-400"
+          href="/"
+        >
+          Customer chat
+        </Link>
+        <Link
+          className="text-sm text-zinc-600 underline dark:text-zinc-400"
+          href="/staff"
+        >
+          Staff
+        </Link>
+      </div>
     </main>
   );
 }

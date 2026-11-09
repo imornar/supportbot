@@ -45,6 +45,7 @@ test("asks a question, shows a citation, and requests a human", async ({
   const sent = await messageRequest;
   expect(new URL(sent.url()).searchParams.has("tenantId")).toBe(false);
   expect(sent.headers()["idempotency-key"]).toBeTruthy();
+  await expect(page.getByText("Internal notes")).toHaveCount(0);
   await expect(page.getByText("AI-generated")).toBeVisible();
   await expect(page.getByText("The packing slip is in the box.")).toBeVisible();
   await page.getByText("Packing, Slip").click();

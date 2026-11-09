@@ -71,6 +71,14 @@ describe("staff route permissions", () => {
     );
   });
 
+  it("names audit:read and refuses before a query", async () => {
+    await expectForbidden("audit:read", async (handlers) =>
+      handlers.listAudit(request("GET", `/api/v1/tenants/${tenantId}/audit`), {
+        params: Promise.resolve({ tenantId }),
+      }),
+    );
+  });
+
   it("names ticket:read for the queue and refuses before a query", async () => {
     const seen: Permission[] = [];
     const db = vi.fn(() => {

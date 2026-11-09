@@ -8,6 +8,7 @@ import {
 import { isRole, type Permission, type Role } from "@/server/auth/permissions";
 import { getDb } from "@/server/db/client";
 import type { TenantQueryClient } from "@/server/db/tenant-queries";
+import { listPermittedAuditEvents } from "@/server/tenants/audit-list";
 import {
   assignRole,
   deactivateMembership,
@@ -163,6 +164,21 @@ export function createTenantAdminHandlers(
           membershipId,
         );
         return Response.json({ member });
+      });
+    },
+
+    async listAudit(request: Request, context: TenantContext) {
+      return guard(async () => {
+        const tenantId = await tenantIdFrom(context);
+        if (tenantId instanceof Response) {
+          return tenantId;
+        }
+        const actor = await authorize(deps, request, "audit:read", tenantId);
+        const events = await listPermittedAuditEvents(
+          deps.db(),
+          actor.tenantId,
+        );
+        return Response.json(events);
       });
     },
 
