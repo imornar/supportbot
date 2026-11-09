@@ -135,6 +135,10 @@ The rate limit is `support_rate_buckets`. The key is `user:<tenant>:<user>` or `
 
 A repeated idempotency key for the same customer, or for the logged-out demo in that public tenant, returns the original two messages and, when that turn opened a ticket, the same ticket id with the ticket's current status. The key is not checked against a new question. A public idempotency key is a bearer token for that public answer. Clients should use a fresh UUID per submit.
 
+## Customer chat page
+
+The home page calls `POST /api/v1/support/messages` and `GET /api/v1/tickets/:id`. It does not call OpenAI, and it does not send a tenant id, user id, or tool name in the JSON body. A signed-in page offers tenant ids loaded on the server from that user's active customer memberships. The route still checks the membership. A logged-out page has no tenant id in the document. A response that fails, or a JSON object that does not match the customer schema, is shown as a failure. A ticket object with a `notes` field is rejected in the browser and is not rendered. The status sentence says a person has accepted the request only for `assigned` and `in_progress`.
+
 ## Tickets
 
 `POST /api/v1/tickets` takes `tenantId` as a query parameter and `conversationId` plus `reason` in the body. The reason has to be `customer_requested_human`. A `priority` field is rejected. The handler loads `conversation:create` for that tenant, then inserts only when the conversation is private and `customer_user_id` is the actor. Another customer's conversation is a 404. A second open ticket for the same conversation and reason returns the existing row. `open`, `assigned`, `in_progress`, and `reopened` all count as open for that unique index. `resolved` does not. `closed` is in the enum and has no transition.

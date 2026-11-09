@@ -18,8 +18,8 @@ Status values: `not_started`, `in_progress`, `in_review`, `done`.
 | [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | done        |
 | [10](./steps/10-order-lookup.md)          | Authorized order lookup              | 04, 09                                    | done        |
 | [11](./steps/11-tickets.md)               | Tickets and escalation               | 08, 09                                    | done        |
-| [12](./steps/12-staff-operations.md)      | Staff and admin operations           | 05, 11                                    | in_review   |
-| [13](./steps/13-customer-ui.md)           | Customer chat UI                     | 08, 09, 11                                | not_started |
+| [12](./steps/12-staff-operations.md)      | Staff and admin operations           | 05, 11                                    | done        |
+| [13](./steps/13-customer-ui.md)           | Customer chat UI                     | 08, 09, 11                                | in_review   |
 | [14](./steps/14-staff-ui.md)              | Staff and admin UI                   | 12, 13                                    | not_started |
 | [15](./steps/15-evaluation.md)            | Evaluation harness                   | 06, 07, 09                                | not_started |
 | [16](./steps/16-security-verification.md) | Security verification                | 04 through the latest merged product step | not_started |

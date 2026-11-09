@@ -41,4 +41,10 @@ jobs:
           DATABASE_URL: postgresql://supportpilot:supportpilot@localhost:5432/supportpilot
       - run: npm run build
         env:
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          CI: true
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          AUTH_SECRET: playwright-not-a-production-secret
