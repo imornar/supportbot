@@ -18,7 +18,7 @@ Node.js `26.x` is the version Vercel uses by default for new projects, and it is
 8. GitHub login needs `AUTH_SECRET`, `AUTH_GITHUB_ID`, and `AUTH_GITHUB_SECRET`. The OAuth callback is `http://localhost:3000/api/auth/callback/github`. This repository does not ship those credentials.
 9. `npm run dev`
 
-The app builds with no live database. `NEXT_PUBLIC_APP_URL` is required because the home page reads it on the server. Health does not. Readiness opens a short database check only when the route is called.
+The app builds with no live database. `NEXT_PUBLIC_APP_URL` is required because the home page reads it on the server. The home page is the customer chat. A logged-out visit does not open a database connection. A signed-in visit does, to list that user's customer memberships. Health does not. Readiness opens a short database check only when the route is called. `npm run test:e2e` starts the production server and runs the Playwright customer chat against a mocked message route.
 
 Migration commands, pooled versus direct strings, and rollback are in [`docs/runbooks/migrations.md`](runbooks/migrations.md).
 
