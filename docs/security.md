@@ -99,7 +99,21 @@ A conflict flag is the model's report that the evidence disagrees. The server re
 
 A provider exception, a timeout, invalid JSON, or a missing API key becomes an abstention with a fixed sentence. The provider error message is not copied. The OpenAI client is configured with `maxRetries: 0`, and this module retries at most two times, only for timeouts, connection failures, and HTTP 408, 409, 429, and 5xx. Each attempt uses `AbortSignal.timeout`. The limit is `SUPPORTPILOT_AI_REQUEST_TIMEOUT_MS`, from 1000 to 30000, and 10000 when unset.
 
-Token usage is a field on the in-memory result. Nothing in this step writes it, logs the prompt, or logs the document text. There is still no chat route.
+Token usage stays on the in-memory result. The conversation step does not write it, and it does not log the prompt or the document text.
+
+## Conversations
+
+`POST /api/v1/support/messages` is the customer question route. The JSON body may contain `question` and, for a signed-in customer, `conversationId`. It may not contain a tenant id, a user id, an order id, a tool name, or a history array. Zod rejects those fields. The idempotency key is the `Idempotency-Key` header, and it has to be a UUID.
+
+A signed-in caller passes `tenantId` as a query parameter. That value only selects which membership `requirePermission` loads. The insert uses the tenant id on the grant. The permission is `conversation:create` for a new message and `conversation:read` for history. A customer can list and read private conversations whose `customer_user_id` is their user id. Another customer's id is a 404. A support agent does not have `conversation:read` on this route. Ticket context is a later step.
+
+A logged-out caller cannot pass `tenantId` or `conversationId`. The tenant is the row whose slug is `SUPPORTPILOT_PUBLIC_TENANT_SLUG`. Local seed data uses `harbor` (Harbor Goods). If the variable is unset or the slug does not match a tenant, the route returns `public_tenant_unavailable`. The handler stores that conversation with `is_private = false` and a null customer. There is no order lookup on this route. `GET /api/v1/conversations` without a session is 401. A non-private conversation can be read by its id without a session. The id is the secret. Private rows stay hidden from that read.
+
+The message table is the product record. An assistant row stores the outcome (`answered` or `abstained`), the citation check (`passed`, `failed`, or `not_applicable`), the model id, and a short reason code. Citations stored on an answered message are the validated excerpts copied from retrieved chunks. The raw provider payload and token usage are not columns. `audit_events` still has no payload. A signed-in answer also writes `conversation.answer` with the actor and the conversation id. A logged-out answer has no actor, so it does not write an audit event. The message row is the record.
+
+The rate limit is `support_rate_buckets`. The key is `user:<tenant>:<user>` or `public:<tenant>:<sha256 of the client address>`. The window is one database minute. `SUPPORTPILOT_RATE_LIMIT_PER_MINUTE` defaults to 60. A replay of a completed idempotency key does not take another slot. The counter is not a process-local map.
+
+A repeated idempotency key for the same customer, or for the logged-out demo in that public tenant, returns the original two messages. The key is not checked against a new question. A public idempotency key is a bearer token for that public answer. Clients should use a fresh UUID per submit.
 
 ## Retention
 
@@ -111,6 +125,6 @@ What this schema stores, and how long it is meant to live:
 - Audit events are kept for the life of the tenant record. They are not a place to store message text, document text, or secrets.
 - Document rows and chunks stay when a version is superseded or retired. Retirement and supersession clear `is_current`. They do not delete the text or the audit row. A failed reindex deletes that version's chunk rows so a failed document has no vectors. The source text remains, and a later reindex can rebuild the chunks.
 - Do not log document bodies or embedding errors. Provider exceptions can echo the input.
-- Conversations and tickets are not in this migration. When they arrive, keep them with the tenant, do not log their contents by default, and do not delete them as a side effect of a membership change.
+- Conversations and messages stay with the tenant. Deactivating a membership does not delete them. This step does not expire or purge them. Do not log message bodies by default. Rate-limit buckets older than two minutes are deleted by the limiter. Tickets are still not stored.
 
 Development seed data uses fixed example identities and no passwords. `npm run db:seed` refuses `NODE_ENV=production`, any Vercel runtime, and Vercel preview or production. The seed is not a migration and must not be pointed at a production database.
