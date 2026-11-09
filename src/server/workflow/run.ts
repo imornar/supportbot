@@ -3,6 +3,8 @@ import "server-only";
 import { GraphRecursionError } from "@langchain/langgraph";
 
 import {
+  defaultSupportName,
+  isPublicSupportName,
   workflowFailureDecision,
   type PersistedAnswer,
 } from "@/server/workflow/decision";
@@ -30,6 +32,9 @@ export async function runSupportWorkflow(input: {
     requested <= workflowRecursionLimit
       ? requested
       : workflowRecursionLimit;
+  const supportName = isPublicSupportName(input.context.supportName)
+    ? input.context.supportName
+    : defaultSupportName;
   try {
     const { graph } = createSupportWorkflow(input.context.timeoutMs);
     const result = await graph.invoke(
@@ -39,11 +44,11 @@ export async function runSupportWorkflow(input: {
         context: input.context,
       },
     );
-    return result.decision ?? workflowFailureDecision();
+    return result.decision ?? workflowFailureDecision("ordinary", supportName);
   } catch (error) {
     if (error instanceof GraphRecursionError) {
-      return workflowFailureDecision();
+      return workflowFailureDecision("ordinary", supportName);
     }
-    return workflowFailureDecision();
+    return workflowFailureDecision("ordinary", supportName);
   }
 }

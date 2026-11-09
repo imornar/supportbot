@@ -147,13 +147,25 @@ A signed-in workflow escalation calls the same insert. The customer sentence rem
 
 Ticket audit actions are `ticket.create`, `ticket.claim`, `ticket.reply`, `ticket.note`, `ticket.resolve`, and `ticket.reopen`. They do not store the reply body.
 
+`GET /api/v1/tickets` accepts optional `status` and `priority` query parameters. An unknown value is `validation_failed`. The SQL filter still includes `tickets.tenant_id`, and a customer filter also includes `requester_user_id`. A support agent does not gain `tenant:user:manage` by holding ticket permissions.
+
+## Staff operations
+
+Document list, detail, reindex, and retire stay on `document:read`, `document:update`, and `document:retire`. Reindex calls `storeChunks`, the same write as upload. Retire writes `document.retire`. The audit row stores the actor and the document id, not the body.
+
+`GET /api/v1/tenants/:tenantId/members` requires `tenant:user:manage`. Assign, revoke, and deactivate use that same permission. The tenant id in the path only selects which membership `requirePermission` loads. The membership update then filters `tenant_memberships.tenant_id` and `role_assignments.tenant_id` with that grant. An admin of tenant A receives 403 for tenant B. A membership id from tenant B, sent on tenant A's path, is 404. There is no superuser in the client bundle.
+
+The last active `tenant_admin` cannot be revoked or deactivated. That check runs in the same transaction that locks the tenant's membership rows. A role change is a row in `role_assignments`. The next request loads roles again. Deactivation sets `tenant_memberships.status` to `deactivated` and leaves the user row in place. `loadMembershipAccess` ignores that row, so the next permission check is forbidden. A support agent does not hold `tenant:user:manage` or `tenant:settings:manage`.
+
+`GET` and `PATCH /api/v1/tenants/:tenantId/settings` require `tenant:settings:manage`. The only setting is `tenants.public_support_name`. The support workflow reads it when it builds an escalation sentence. The sentence still ends with "has not accepted this yet." The name is a short label, not a free-form message. Audit action `tenant.settings` stores the actor and the tenant id. It does not store the name. Role changes write `membership.role_assign`, `membership.role_revoke`, and `membership.deactivate` against the membership id.
+
 ## Retention
 
 Conversations and tickets are not stored yet. Document text is.
 
 What this schema stores, and how long it is meant to live:
 
-- Tenants, users, memberships, and role assignments stay until an operator deactivates the membership or a later step defines deletion. Deactivation is a status. This step does not delete users to remove access.
+- Tenants, users, memberships, and role assignments stay until an operator deactivates the membership. Deactivation is a status. It does not delete the user, the membership, or the role rows. A later step can define deletion.
 - Audit events are kept for the life of the tenant record. They are not a place to store message text, document text, or secrets.
 - Document rows and chunks stay when a version is superseded or retired. Retirement and supersession clear `is_current`. They do not delete the text or the audit row. A failed reindex deletes that version's chunk rows so a failed document has no vectors. The source text remains, and a later reindex can rebuild the chunks.
 - Do not log document bodies or embedding errors. Provider exceptions can echo the input.

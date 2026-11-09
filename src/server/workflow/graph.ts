@@ -19,7 +19,8 @@ import {
   clarificationDecision,
   escalationDecision,
   fromGrounded,
-  humanEscalationMessage,
+  humanEscalationMessageFor,
+  isPublicSupportName,
   orderFoundDecision,
   orderRefusalDecision,
   orderUnavailableDecision,
@@ -60,6 +61,7 @@ export type SupportWorkflowContext = {
   chat: ChatProvider;
   retrieve: (question: string) => Promise<RetrievedEvidence[]>;
   orderAccess: OrderAccess;
+  supportName: string;
 };
 
 type RetrievalStatus = "ok" | "empty" | "failed";
@@ -146,7 +148,8 @@ function isWorkflowContext(value: unknown): value is SupportWorkflowContext {
     typeof candidate.timeoutMs === "number" &&
     typeof candidate.retrieve === "function" &&
     typeof candidate.chat?.complete === "function" &&
-    isOrderAccess(candidate.orderAccess)
+    isOrderAccess(candidate.orderAccess) &&
+    isPublicSupportName(candidate.supportName)
   );
 }
 
@@ -227,9 +230,14 @@ function clarifyNode() {
   return { decision: clarificationDecision("needs_clarification") };
 }
 
-function abstainNode(state: WorkflowState) {
+function abstainNode(state: WorkflowState, config: NodeConfig) {
   if (state.intent !== "ordinary") {
-    return { decision: workflowFailureDecision() };
+    return {
+      decision: workflowFailureDecision(
+        state.intent ?? "ordinary",
+        readContext(config).supportName,
+      ),
+    };
   }
   if (state.retrieval === "failed" || !state.grounded) {
     return { decision: retrievalFailureDecision() };
@@ -237,17 +245,20 @@ function abstainNode(state: WorkflowState) {
   return { decision: fromGrounded(state.grounded, "ordinary") };
 }
 
-function escalateNode(state: WorkflowState) {
+function escalateNode(state: WorkflowState, config: NodeConfig) {
+  const supportName = readContext(config).supportName;
   if (state.intent === "human_request") {
     return {
       decision: escalationDecision(
         "human_request",
         "customer_requested_human",
-        humanEscalationMessage,
+        humanEscalationMessageFor(supportName),
       ),
     };
   }
-  return { decision: workflowFailureDecision() };
+  return {
+    decision: workflowFailureDecision(state.intent ?? "ordinary", supportName),
+  };
 }
 
 async function lookupOrderNode(state: WorkflowState, config: NodeConfig) {
@@ -282,7 +293,12 @@ async function lookupOrderNode(state: WorkflowState, config: NodeConfig) {
     }
     return { decision: orderRefusalDecision() };
   } catch {
-    return { decision: workflowFailureDecision("possible_order") };
+    return {
+      decision: workflowFailureDecision(
+        "possible_order",
+        readContext(config).supportName,
+      ),
+    };
   }
 }
 

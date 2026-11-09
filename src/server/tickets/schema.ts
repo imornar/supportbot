@@ -90,6 +90,36 @@ export type StaffTicket = z.infer<typeof staffTicketSchema>;
 export type TicketSummary = z.infer<typeof ticketSummarySchema>;
 export type TicketAudience = "customer" | "agent" | "queue";
 
+export function parseTicketListFilters(url: URL):
+  | {
+      ok: true;
+      status?: (typeof ticketStatuses)[number];
+      priority?: (typeof ticketPriorities)[number];
+    }
+  | { ok: false } {
+  const status = url.searchParams.get("status");
+  const priority = url.searchParams.get("priority");
+  if (
+    status !== null &&
+    !ticketStatuses.includes(status as (typeof ticketStatuses)[number])
+  ) {
+    return { ok: false };
+  }
+  if (
+    priority !== null &&
+    !ticketPriorities.includes(priority as (typeof ticketPriorities)[number])
+  ) {
+    return { ok: false };
+  }
+  return {
+    ok: true,
+    ...(status ? { status: status as (typeof ticketStatuses)[number] } : {}),
+    ...(priority
+      ? { priority: priority as (typeof ticketPriorities)[number] }
+      : {}),
+  };
+}
+
 export function ticketAudience(
   permissions: readonly Permission[],
 ): TicketAudience {

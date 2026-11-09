@@ -166,6 +166,57 @@ describe("document routes", () => {
     expect(await oversized.json()).toEqual({ error: "payload_too_large" });
     expect(db).not.toHaveBeenCalled();
   });
+
+  it("refuses list, detail, reindex, and retire without the route permission", async () => {
+    const db = vi.fn(() => {
+      throw new Error("database was touched");
+    });
+    const handlers = createDocumentHandlers({
+      authorize: async () => {
+        throw new ForbiddenError();
+      },
+      db,
+    });
+    const documentId = "33333333-3333-4333-8333-333333333333";
+    const list = await handlers.list(
+      new Request(
+        `http://localhost:3000/api/v1/documents?tenantId=${tenantId}`,
+      ),
+    );
+    const detail = await handlers.read(
+      new Request(
+        `http://localhost:3000/api/v1/documents/${documentId}?tenantId=${tenantId}`,
+      ),
+      { params: Promise.resolve({ documentId }) },
+    );
+    const reindex = await handlers.reindex(
+      new Request(
+        `http://localhost:3000/api/v1/documents/${documentId}/reindex`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ tenantId }),
+        },
+      ),
+      { params: Promise.resolve({ documentId }) },
+    );
+    const retire = await handlers.retire(
+      new Request(
+        `http://localhost:3000/api/v1/documents/${documentId}/retire`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ tenantId }),
+        },
+      ),
+      { params: Promise.resolve({ documentId }) },
+    );
+    for (const response of [list, detail, reindex, retire]) {
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: "forbidden" });
+    }
+    expect(db).not.toHaveBeenCalled();
+  });
 });
 
 function uploadRequest(content = "Purple widget policy."): Request {

@@ -12,11 +12,35 @@ import {
 import {
   createTicketBodySchema,
   customerTicketSchema,
+  parseTicketListFilters,
 } from "@/server/tickets/schema";
 import { humanEscalationMessage } from "@/server/workflow/decision";
 
 const agent = "10000000-0000-4000-8000-000000000003";
 const other = "10000000-0000-4000-8000-000000000001";
+
+describe("ticket list filters", () => {
+  it("accepts one status and one priority and rejects unknown values", () => {
+    expect(
+      parseTicketListFilters(
+        new URL("http://localhost/api/v1/tickets?status=open&priority=high"),
+      ),
+    ).toEqual({ ok: true, status: "open", priority: "high" });
+    expect(
+      parseTicketListFilters(new URL("http://localhost/api/v1/tickets")),
+    ).toEqual({ ok: true });
+    expect(
+      parseTicketListFilters(
+        new URL("http://localhost/api/v1/tickets?status=nope"),
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseTicketListFilters(
+        new URL("http://localhost/api/v1/tickets?priority="),
+      ).ok,
+    ).toBe(false);
+  });
+});
 
 describe("ticket priority", () => {
   it("assigns priority from the reason and ignores a client priority field", () => {

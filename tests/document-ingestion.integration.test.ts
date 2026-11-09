@@ -309,6 +309,9 @@ describe.skipIf(!databaseUrl)("document ingestion", () => {
       expect(events.some((event) => event.action === "document.create")).toBe(
         true,
       );
+      expect(events.some((event) => event.action === "document.retire")).toBe(
+        true,
+      );
       expect(events.some((event) => event.actorUserId === ken.id)).toBe(true);
       const serialized = JSON.stringify(events);
       expect(serialized).not.toContain("Purple widget");

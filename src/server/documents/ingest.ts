@@ -283,6 +283,9 @@ export async function retireDocument(
   return reload(deps.db, actor.tenantId, row.id);
 }
 
+/**
+ * Rebuilds chunks with `storeChunks`, the same write used after upload.
+ */
 export async function reindexDocument(
   actor: DocumentActor,
   documentId: string,

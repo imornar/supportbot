@@ -33,8 +33,31 @@ export const workflowOutcomes = [
 
 export type WorkflowOutcome = (typeof workflowOutcomes)[number];
 
+export const defaultSupportName = "A support agent";
+
+export const publicSupportNamePattern = /^[A-Za-z0-9][A-Za-z0-9 .&-]{0,79}$/;
+
+export function isPublicSupportName(value: string): boolean {
+  return publicSupportNamePattern.test(value);
+}
+
+export function humanEscalationMessageFor(supportName: string): string {
+  return awaitingAcceptance("You asked for a person.", supportName);
+}
+
+export function workflowFailureMessageFor(supportName: string): string {
+  return awaitingAcceptance("I can't complete that request.", supportName);
+}
+
+function awaitingAcceptance(lead: string, supportName: string): string {
+  const name = isPublicSupportName(supportName)
+    ? supportName
+    : defaultSupportName;
+  return `${lead} ${name} has not accepted this yet.`;
+}
+
 export const humanEscalationMessage =
-  "You asked for a person. A support agent has not accepted this yet.";
+  humanEscalationMessageFor(defaultSupportName);
 
 export const signInForOrderMessage = "Sign in to look up an order.";
 
@@ -45,7 +68,7 @@ export const orderRefusalMessage =
   "I can only look up one order that belongs to you.";
 
 export const workflowFailureMessage =
-  "I can't complete that request. A support agent has not accepted this yet.";
+  workflowFailureMessageFor(defaultSupportName);
 
 export const clarificationMessage =
   "Could you share a bit more about what you want to know?";
@@ -189,8 +212,13 @@ export function orderFoundDecision(order: OrderSummary): PersistedAnswer {
 
 export function workflowFailureDecision(
   intent: WorkflowIntent = "ordinary",
+  supportName: string = defaultSupportName,
 ): PersistedAnswer {
-  return escalationDecision(intent, "workflow_failure", workflowFailureMessage);
+  return escalationDecision(
+    intent,
+    "workflow_failure",
+    workflowFailureMessageFor(supportName),
+  );
 }
 
 function acceptCitations(

@@ -10,6 +10,7 @@ import { createSessionOrderLookup } from "@/server/orders/lookup";
 import { retrieveEvidence } from "@/server/retrieval/retrieve";
 import type { RetrievalSettings } from "@/server/retrieval/settings";
 import { fromGrounded, type PersistedAnswer } from "@/server/workflow/decision";
+import { loadPublicSupportName } from "@/server/tenants/settings";
 import { runSupportWorkflow } from "@/server/workflow/run";
 
 export { fromGrounded, type PersistedAnswer };
@@ -37,6 +38,7 @@ export async function answerSupportQuestion(input: {
       }
     | { kind: "anonymous" };
 }): Promise<PersistedAnswer> {
+  const supportName = await loadPublicSupportName(input.db, input.tenantId);
   const orderAccess = orderAccessForActor({
     kind: input.actor.kind,
     permissions: input.actor.kind === "customer" ? input.actor.permissions : [],
@@ -58,6 +60,7 @@ export async function answerSupportQuestion(input: {
       chat: input.chat,
       retrieve: (question) => retrieveAuthorizedEvidence(input, question),
       orderAccess,
+      supportName,
     },
   });
 }
