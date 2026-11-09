@@ -38,6 +38,10 @@ When the project exists, set `DATABASE_URL` in Vercel to the Neon pooled connect
 
 `RETRIEVAL_TOP_K` and `RETRIEVAL_SIMILARITY_THRESHOLD` are optional. Unset, they are 5 and 0.3. A deployment can leave them unset. They are not secrets and must not use the `NEXT_PUBLIC_` prefix. Changing them does not require a migration.
 
+`SUPPORTPILOT_RATE_LIMIT_PER_MINUTE` is the database counter for `POST /api/v1/support/messages`. Unset means 60. The allowed range is 1 to 600. It is not a secret.
+
+`SUPPORTPILOT_PUBLIC_TENANT_SLUG` is the tenant a logged-out question uses. The server looks up that slug. It does not trust a tenant id in the body. Local development can set it to `harbor` after `npm run db:seed`. Leave it unset and logged-out questions fail closed. The value is not a secret and must not use the `NEXT_PUBLIC_` prefix. Changing it does not require a migration. The tenant row has to exist.
+
 ## Preview
 
 - A Vercel preview deployment for the pull request.

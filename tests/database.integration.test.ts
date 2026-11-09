@@ -69,14 +69,22 @@ describe.skipIf(!databaseUrl)("postgres", () => {
           'role_assignments',
           'audit_events',
           'documents',
-          'document_chunks'
+          'document_chunks',
+          'conversations',
+          'messages',
+          'support_submissions',
+          'support_rate_buckets'
         )
     `);
     expect(tables.rows.map((row) => row.tablename).sort()).toEqual([
       "audit_events",
+      "conversations",
       "document_chunks",
       "documents",
+      "messages",
       "role_assignments",
+      "support_rate_buckets",
+      "support_submissions",
       "tenant_memberships",
       "tenants",
       "users",
@@ -91,7 +99,7 @@ describe.skipIf(!databaseUrl)("postgres", () => {
       select table_name, column_name
       from information_schema.columns
       where table_schema = 'public'
-        and table_name in ('users', 'audit_events')
+        and table_name in ('users', 'audit_events', 'messages')
     `);
     const names = columns.rows.map(
       (row) => `${row.table_name}.${row.column_name}`,
@@ -102,6 +110,17 @@ describe.skipIf(!databaseUrl)("postgres", () => {
       false,
     );
     expect(names).not.toContain("audit_events.metadata");
+    expect(names).not.toContain("messages.payload");
+    expect(names).not.toContain("messages.provider_response");
+    expect(names).not.toContain("messages.usage");
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "messages.outcome",
+        "messages.citation_validation",
+        "messages.model_id",
+        "messages.answer_reason",
+      ]),
+    );
     expect(names).toEqual(
       expect.arrayContaining([
         "users.email",

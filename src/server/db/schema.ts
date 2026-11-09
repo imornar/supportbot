@@ -7,6 +7,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -419,3 +420,279 @@ export const documentChunks = pgTable(
     ),
   ],
 );
+
+/**
+ * A conversation belongs to one tenant. Private rows name the customer who
+ * owns them. Public rows are general questions from the logged-out demo:
+ * `customer_user_id` stays null and `is_private` is false. The handler sets
+ * that flag. A client cannot.
+ *
+ * Message text is the product record. Audit metadata on an assistant message
+ * is the outcome, the citation check, the model id, and a short reason code.
+ * There is no column for the raw provider payload.
+ */
+export const messageRole = pgEnum("message_role", ["user", "assistant"]);
+
+export const messageOutcome = pgEnum("message_outcome", [
+  "answered",
+  "abstained",
+]);
+
+export const citationValidation = pgEnum("citation_validation", [
+  "passed",
+  "failed",
+  "not_applicable",
+]);
+
+export const submissionStatus = pgEnum("submission_status", [
+  "pending",
+  "complete",
+]);
+
+const answerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed'`;
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    customerUserId: uuid("customer_user_id").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+    isPrivate: boolean("is_private").notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    unique("conversations_id_tenant_unique").on(table.id, table.tenantId),
+    unique("conversations_id_tenant_customer_unique").on(
+      table.id,
+      table.tenantId,
+      table.customerUserId,
+    ),
+    index("conversations_tenant_customer_updated_idx").on(
+      table.tenantId,
+      table.customerUserId,
+      table.updatedAt,
+    ),
+    check(
+      "conversations_private_owner",
+      sql`(
+        ${table.isPrivate} = true and ${table.customerUserId} is not null
+      ) or (
+        ${table.isPrivate} = false and ${table.customerUserId} is null
+      )`,
+    ),
+  ],
+);
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    conversationId: uuid("conversation_id").notNull(),
+    role: messageRole("role").notNull(),
+    body: text("body").notNull(),
+    outcome: messageOutcome("outcome"),
+    citationValidation: citationValidation("citation_validation"),
+    modelId: text("model_id"),
+    answerReason: text("answer_reason"),
+    citations: jsonb("citations")
+      .$type<StoredCitation[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("messages_id_tenant_unique").on(table.id, table.tenantId),
+    index("messages_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "messages_conversation_tenant_fk",
+      columns: [table.conversationId, table.tenantId],
+      foreignColumns: [conversations.id, conversations.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check(
+      "messages_body_length",
+      sql`char_length(${table.body}) between 1 and 4000`,
+    ),
+    check(
+      "messages_model_id_shape",
+      sql`${table.modelId} is null or ${table.modelId} ~ '^[A-Za-z0-9._:-]{1,64}$'`,
+    ),
+    check(
+      "messages_answer_reason",
+      sql`${table.answerReason} is null or ${table.answerReason} in (${answerReasonSql})`,
+    ),
+    check(
+      "messages_citations_array",
+      sql`jsonb_typeof(${table.citations}) = 'array' and jsonb_array_length(${table.citations}) <= 20`,
+    ),
+    check(
+      "messages_user_has_no_audit_fields",
+      sql`${table.role} <> 'user' or (
+        ${table.outcome} is null
+        and ${table.citationValidation} is null
+        and ${table.modelId} is null
+        and ${table.answerReason} is null
+        and ${table.citations} = '[]'::jsonb
+      )`,
+    ),
+    check(
+      "messages_assistant_audit_fields",
+      sql`${table.role} <> 'assistant' or (
+        ${table.outcome} is not null
+        and ${table.citationValidation} is not null
+        and ${table.answerReason} is not null
+      )`,
+    ),
+  ],
+);
+
+/**
+ * One row per submit. The idempotency key is unique for a customer inside a
+ * tenant, and unique for the logged-out demo inside the public tenant.
+ * Pending means the model call is still in flight. Complete points at the
+ * two message rows that were the original result.
+ */
+export const supportSubmissions = pgTable(
+  "support_submissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    customerUserId: uuid("customer_user_id").references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    status: submissionStatus("status").notNull().default("pending"),
+    conversationId: uuid("conversation_id"),
+    userMessageId: uuid("user_message_id"),
+    assistantMessageId: uuid("assistant_message_id"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("support_submissions_customer_key_unique")
+      .on(table.tenantId, table.customerUserId, table.idempotencyKey)
+      .where(sql`${table.customerUserId} is not null`),
+    uniqueIndex("support_submissions_public_key_unique")
+      .on(table.tenantId, table.idempotencyKey)
+      .where(sql`${table.customerUserId} is null`),
+    foreignKey({
+      name: "support_submissions_conversation_tenant_fk",
+      columns: [table.conversationId, table.tenantId],
+      foreignColumns: [conversations.id, conversations.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "support_submissions_conversation_customer_fk",
+      columns: [table.conversationId, table.tenantId, table.customerUserId],
+      foreignColumns: [
+        conversations.id,
+        conversations.tenantId,
+        conversations.customerUserId,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "support_submissions_user_message_fk",
+      columns: [table.userMessageId, table.tenantId],
+      foreignColumns: [messages.id, messages.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "support_submissions_assistant_message_fk",
+      columns: [table.assistantMessageId, table.tenantId],
+      foreignColumns: [messages.id, messages.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check(
+      "support_submissions_key_uuid",
+      sql`${table.idempotencyKey} ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`,
+    ),
+    check(
+      "support_submissions_complete_links",
+      sql`(
+        ${table.status} = 'pending'
+        and ${table.conversationId} is null
+        and ${table.userMessageId} is null
+        and ${table.assistantMessageId} is null
+      ) or (
+        ${table.status} = 'complete'
+        and ${table.conversationId} is not null
+        and ${table.userMessageId} is not null
+        and ${table.assistantMessageId} is not null
+        and ${table.userMessageId} <> ${table.assistantMessageId}
+      )`,
+    ),
+  ],
+);
+
+/**
+ * Fixed-window counter for `POST /api/v1/support/messages`. The key is a
+ * tenant plus a user id, or a tenant plus a hash of the client address.
+ * Rows older than a few minutes are deleted by the limiter. A process-local
+ * map would not survive a second serverless instance, so this table is the
+ * limiter.
+ */
+export const supportRateBuckets = pgTable(
+  "support_rate_buckets",
+  {
+    bucketKey: text("bucket_key").notNull(),
+    windowStart: timestamp("window_start", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    requestCount: integer("request_count").notNull(),
+  },
+  (table) => [
+    unique("support_rate_buckets_key_window_unique").on(
+      table.bucketKey,
+      table.windowStart,
+    ),
+    check(
+      "support_rate_buckets_key_shape",
+      sql`${table.bucketKey} ~ '^(user|public):[0-9a-f-]{36}:[0-9a-f-]{36,64}$'`,
+    ),
+    check(
+      "support_rate_buckets_count_positive",
+      sql`${table.requestCount} >= 1`,
+    ),
+  ],
+);
+
+export type StoredCitation = {
+  chunkId: string;
+  documentId: string;
+  title: string;
+  section: string | null;
+  documentVersion: number;
+  effectiveDate: string | null;
+  excerpt: string;
+};
