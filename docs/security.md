@@ -105,7 +105,7 @@ Token usage stays on the in-memory result. The conversation step does not write 
 
 Authorization finishes before `runSupportWorkflow`. The graph context is the tenant id already on the grant, the server date, a timeout, the chat provider, and a retrieve function closed over that tenant's database client. The graph module does not import the database client or read `DATABASE_URL`.
 
-The nodes are a fixed list: `classify`, `retrieve`, `judge`, `answer`, `clarify`, `abstain`, and `escalate`. There is no tool node. A model JSON field named `tool` fails the answer schema and becomes an abstention. A possible order question escalates with `business_tool_unavailable` because order lookup is not registered.
+The nodes are a fixed list: `classify`, `retrieve`, `judge`, `answer`, `clarify`, `abstain`, `escalate`, and `lookup_order`. There is no node that reads a tool name from the model. A model JSON field named `tool` on a grounded answer fails the answer schema and becomes an abstention. `lookup_order` is registered only for an authenticated customer whose grant includes `order:read`. A knowledge manager does not receive that permission, and an anonymous caller does not receive the lookup function. Those callers get a fixed refusal or a request to sign in. The lookup is not a query the model writes.
 
 Classification is a lexical rule. "Talk to a human" cannot be reclassified by the model, because the model is not asked. The same is true for an order-number question and for a question that is only a greeting.
 
@@ -113,13 +113,21 @@ Classification is a lexical rule. "Talk to a human" cannot be reclassified by th
 
 The workflow does not register a tracing callback. A process-wide LangSmith tracer would still be able to see the question and the retrieved text, so this app does not set one.
 
+## Order lookup
+
+`readModelOrder` takes the tenant id and user id the server already resolved. It does not take a customer id from the model. The model may propose one numeric order number. A payload with a list, a wildcard, or any field other than `orderId` and `customerId` is not a query. When that payload is not one order number, the server uses a single order number from the question if the question contains exactly one. Several numbers, or none, return a fixed refusal and do not select a list of orders.
+
+The SQL predicate is `orders.tenant_id` plus `customers.user_id` for the session. The select list is the order id, order number, status, placed-on date, and summary. `internal_notes` and `payment_instrument` are real columns. They are not in that select, and they are not in the response schema. A miss, another customer's order in the same tenant, and an order number that exists only in another tenant all return the same refusal. The server does not query another tenant to tell those cases apart. Another customer in the same tenant writes `order.lookup.refused` with the order id as the target. An order number that is not in the caller's tenant writes the same action with the caller's customer id as the target. The audit row has no payload. The lookup does not insert, update, or delete orders.
+
+A logged-out question never calls this function. The assistant message asks the person to sign in.
+
 ## Conversations
 
 `POST /api/v1/support/messages` is the customer question route. The JSON body may contain `question` and, for a signed-in customer, `conversationId`. It may not contain a tenant id, a user id, an order id, a tool name, or a history array. Zod rejects those fields. The idempotency key is the `Idempotency-Key` header, and it has to be a UUID.
 
 A signed-in caller passes `tenantId` as a query parameter. That value only selects which membership `requirePermission` loads. The insert uses the tenant id on the grant. The permission is `conversation:create` for a new message and `conversation:read` for history. A customer can list and read private conversations whose `customer_user_id` is their user id. Another customer's id is a 404. A support agent does not have `conversation:read` on this route. Ticket context is a later step.
 
-A logged-out caller cannot pass `tenantId` or `conversationId`. The tenant is the row whose slug is `SUPPORTPILOT_PUBLIC_TENANT_SLUG`. Local seed data uses `harbor` (Harbor Goods). If the variable is unset or the slug does not match a tenant, the route returns `public_tenant_unavailable`. The handler stores that conversation with `is_private = false` and a null customer. There is no order lookup on this route. `GET /api/v1/conversations` without a session is 401. A non-private conversation can be read by its id without a session. The id is the secret. Private rows stay hidden from that read.
+A logged-out caller cannot pass `tenantId` or `conversationId`. The tenant is the row whose slug is `SUPPORTPILOT_PUBLIC_TENANT_SLUG`. Local seed data uses `harbor` (Harbor Goods). If the variable is unset or the slug does not match a tenant, the route returns `public_tenant_unavailable`. The handler stores that conversation with `is_private = false` and a null customer. An order question on that logged-out path asks the person to sign in and does not query orders. `GET /api/v1/conversations` without a session is 401. A non-private conversation can be read by its id without a session. The id is the secret. Private rows stay hidden from that read.
 
 The message table is the product record. An assistant row stores the workflow outcome (`answered`, `clarified`, `abstained`, or `escalated`), the citation check (`passed`, `failed`, or `not_applicable`), the model id, a short reason code, the intent, and an escalation reason when the outcome is `escalated`. Citations stored on an answered message are the validated excerpts copied from retrieved chunks. The raw provider payload and token usage are not columns. An escalation row is the decision a later ticket step reads. This step does not insert a ticket, and the customer text does not say an agent has accepted. `audit_events` still has no payload. A signed-in answer also writes `conversation.answer` with the actor and the conversation id. A logged-out answer has no actor, so it does not write an audit event. The message row is the record.
 
@@ -138,5 +146,6 @@ What this schema stores, and how long it is meant to live:
 - Document rows and chunks stay when a version is superseded or retired. Retirement and supersession clear `is_current`. They do not delete the text or the audit row. A failed reindex deletes that version's chunk rows so a failed document has no vectors. The source text remains, and a later reindex can rebuild the chunks.
 - Do not log document bodies or embedding errors. Provider exceptions can echo the input.
 - Conversations and messages stay with the tenant. Deactivating a membership does not delete them. This step does not expire or purge them. Do not log message bodies by default. Rate-limit buckets older than two minutes are deleted by the limiter. Tickets are still not stored.
+- Customer and order rows stay with the tenant. Order lookup does not delete them. Do not log internal notes, payment instrument values, or the lookup response by default.
 
 Development seed data uses fixed example identities and no passwords. `npm run db:seed` refuses `NODE_ENV=production`, any Vercel runtime, and Vercel preview or production. The seed is not a migration and must not be pointed at a production database.

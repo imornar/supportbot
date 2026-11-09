@@ -10,13 +10,13 @@ Status values: `not_started`, `in_progress`, `in_review`, `done`.
 | [01](./steps/01-nextjs-foundation.md)     | Next.js application foundation       | 00                                        | done        |
 | [02](./steps/02-database-pgvector.md)     | PostgreSQL, Drizzle, and pgvector    | 01                                        | done        |
 | [03](./steps/03-tenant-audit-schema.md)   | Tenant, membership, and audit schema | 02                                        | done        |
-| [04](./steps/04-auth-and-permissions.md)  | Authentication and permissions       | 03                                        | in_review   |
-| [05](./steps/05-document-ingestion.md)    | Document ingestion                   | 04                                        | in_review   |
-| [06](./steps/06-retrieval.md)             | Tenant-scoped retrieval              | 05                                        | in_review   |
-| [07](./steps/07-grounded-answers.md)      | Grounded answers and citations       | 06                                        | in_review   |
-| [08](./steps/08-conversations-api.md)     | Conversations API                    | 04, 07                                    | in_review   |
-| [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | in_review   |
-| [10](./steps/10-order-lookup.md)          | Authorized order lookup              | 04, 09                                    | not_started |
+| [04](./steps/04-auth-and-permissions.md)  | Authentication and permissions       | 03                                        | done        |
+| [05](./steps/05-document-ingestion.md)    | Document ingestion                   | 04                                        | done        |
+| [06](./steps/06-retrieval.md)             | Tenant-scoped retrieval              | 05                                        | done        |
+| [07](./steps/07-grounded-answers.md)      | Grounded answers and citations       | 06                                        | done        |
+| [08](./steps/08-conversations-api.md)     | Conversations API                    | 04, 07                                    | done        |
+| [09](./steps/09-support-workflow.md)      | Controlled support workflow          | 07, 08                                    | done        |
+| [10](./steps/10-order-lookup.md)          | Authorized order lookup              | 04, 09                                    | in_review   |
 | [11](./steps/11-tickets.md)               | Tickets and escalation               | 08, 09                                    | not_started |
 | [12](./steps/12-staff-operations.md)      | Staff and admin operations           | 05, 11                                    | not_started |
 | [13](./steps/13-customer-ui.md)           | Customer chat UI                     | 08, 09, 11                                | not_started |

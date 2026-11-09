@@ -261,6 +261,91 @@ export const auditEvents = pgTable(
 );
 
 /**
+ * A customer is the person an order belongs to, inside one tenant.
+ * `user_id` is the authenticated account. Order lookup resolves this row
+ * from the session. It does not accept a customer id from model output.
+ */
+export const customers = pgTable(
+  "customers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    ...timestamps(),
+  },
+  (table) => [
+    unique("customers_tenant_user_unique").on(table.tenantId, table.userId),
+    unique("customers_id_tenant_unique").on(table.id, table.tenantId),
+  ],
+);
+
+export const orderStatus = pgEnum("order_status", [
+  "placed",
+  "shipped",
+  "delivered",
+]);
+
+/**
+ * Orders are tenant-owned rows. `internal_notes` and `payment_instrument`
+ * exist so a read can be wrong by selecting them. The lookup query does not.
+ * The model never sends the SQL. Refunds and other writes are out of scope.
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    customerId: uuid("customer_id").notNull(),
+    orderNumber: text("order_number").notNull(),
+    status: orderStatus("status").notNull(),
+    placedOn: date("placed_on", { mode: "string" }).notNull(),
+    summary: text("summary").notNull(),
+    internalNotes: text("internal_notes").notNull(),
+    paymentInstrument: text("payment_instrument").notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    unique("orders_tenant_number_unique").on(table.tenantId, table.orderNumber),
+    unique("orders_id_tenant_unique").on(table.id, table.tenantId),
+    foreignKey({
+      name: "orders_customer_tenant_fk",
+      columns: [table.customerId, table.tenantId],
+      foreignColumns: [customers.id, customers.tenantId],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check("orders_number_shape", sql`${table.orderNumber} ~ '^[0-9]{1,12}$'`),
+    check(
+      "orders_summary_length",
+      sql`char_length(${table.summary}) between 1 and 500`,
+    ),
+    check(
+      "orders_internal_notes_length",
+      sql`char_length(${table.internalNotes}) between 1 and 2000`,
+    ),
+    check(
+      "orders_payment_instrument_length",
+      sql`char_length(${table.paymentInstrument}) between 1 and 120`,
+    ),
+  ],
+);
+
+/**
  * Knowledge documents live in Postgres. The body is untrusted text. Nothing
  * in this table is executed, and local disk is not the store.
  * `is_current` marks the live row for a checksum. A new version clears it on
@@ -450,7 +535,7 @@ export const submissionStatus = pgEnum("submission_status", [
 
 const groundedAnswerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed'`;
 
-const answerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed', 'clarification_needed', 'customer_requested_human', 'business_tool_unavailable', 'workflow_failure'`;
+const answerReasonSql = sql`'grounded', 'no_evidence', 'invalid_question', 'invalid_evidence', 'model_abstained', 'invalid_output', 'invented_citation', 'uncited', 'unresolved_conflict', 'provider_error', 'retrieval_failed', 'clarification_needed', 'customer_requested_human', 'business_tool_unavailable', 'workflow_failure', 'order_lookup', 'order_not_found', 'order_unavailable', 'sign_in_required'`;
 
 const workflowIntentSql = sql`'human_request', 'possible_order', 'ordinary', 'needs_clarification'`;
 
@@ -600,8 +685,21 @@ export const messages = pgTable(
             and ${table.answerReason} = 'customer_requested_human'
           ) or (
             ${table.workflowIntent} = 'possible_order'
-            and ${table.outcome} = 'escalated'
-            and ${table.answerReason} = 'business_tool_unavailable'
+            and (
+              (
+                ${table.outcome} = 'answered'
+                and ${table.answerReason} = 'order_lookup'
+              ) or (
+                ${table.outcome} = 'abstained'
+                and ${table.answerReason} in ('order_not_found', 'order_unavailable')
+              ) or (
+                ${table.outcome} = 'clarified'
+                and ${table.answerReason} = 'sign_in_required'
+              ) or (
+                ${table.outcome} = 'escalated'
+                and ${table.answerReason} in ('business_tool_unavailable', 'workflow_failure')
+              )
+            )
           ) or (
             ${table.workflowIntent} = 'needs_clarification'
             and ${table.outcome} = 'clarified'

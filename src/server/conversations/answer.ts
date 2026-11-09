@@ -1,9 +1,12 @@
 import "server-only";
 
 import type { ChatProvider } from "@/server/answers/provider";
+import type { Permission } from "@/server/auth/permissions";
 import { embeddingDimensions } from "@/server/db/schema";
 import type { EmbeddingProvider } from "@/server/documents/embed";
 import type { TenantQueryClient } from "@/server/db/tenant-queries";
+import { orderAccessForActor } from "@/server/orders/access";
+import { createSessionOrderLookup } from "@/server/orders/lookup";
 import { retrieveEvidence } from "@/server/retrieval/retrieve";
 import type { RetrievalSettings } from "@/server/retrieval/settings";
 import { fromGrounded, type PersistedAnswer } from "@/server/workflow/decision";
@@ -13,8 +16,9 @@ export { fromGrounded, type PersistedAnswer };
 
 /**
  * The handler has already authorized the tenant. This function closes over
- * that tenant id and the database client. The graph receives the closure. It
- * does not receive a connection string or a tool list.
+ * that tenant id and the database client. The graph receives a retrieve
+ * closure and, only for a customer with `order:read`, one order lookup
+ * closure. It does not receive a connection string or a tool list.
  */
 export async function answerSupportQuestion(input: {
   db: TenantQueryClient;
@@ -25,7 +29,26 @@ export async function answerSupportQuestion(input: {
   question: string;
   asOf: string;
   timeoutMs: number;
+  actor:
+    | {
+        kind: "customer";
+        userId: string;
+        permissions: readonly Permission[];
+      }
+    | { kind: "anonymous" };
 }): Promise<PersistedAnswer> {
+  const orderAccess = orderAccessForActor({
+    kind: input.actor.kind,
+    permissions: input.actor.kind === "customer" ? input.actor.permissions : [],
+    lookup:
+      input.actor.kind === "customer" &&
+      input.actor.permissions.includes("order:read")
+        ? createSessionOrderLookup(input.db, {
+            tenantId: input.tenantId,
+            userId: input.actor.userId,
+          })
+        : undefined,
+  });
   return runSupportWorkflow({
     question: input.question,
     context: {
@@ -34,6 +57,7 @@ export async function answerSupportQuestion(input: {
       timeoutMs: input.timeoutMs,
       chat: input.chat,
       retrieve: (question) => retrieveAuthorizedEvidence(input, question),
+      orderAccess,
     },
   });
 }
