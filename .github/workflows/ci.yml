@@ -39,6 +39,9 @@ jobs:
       - run: npm test
         env:
           DATABASE_URL: postgresql://supportpilot:supportpilot@localhost:5432/supportpilot
+      - run: npm run eval -- --strict
+        env:
+          DATABASE_URL: postgresql://supportpilot:supportpilot@localhost:5432/supportpilot
       - run: npm run build
         env:
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
